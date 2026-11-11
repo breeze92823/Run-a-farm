@@ -802,8 +802,10 @@ Object.assign(GAME, {
   rare: { chance: 0.01, giant: 5 }, // golden egg / giant crop chance; a giant crop yields 5x
   tutorial: [
     { id: 'collect', text: 'Collect eggs from Coop 1', sub: 'Walk past the nest crate' },
+    { id: 'stand', text: 'Sell your eggs at the egg stand', sub: 'Walk up to the stand counter: customers buy what you stock' },
+    { id: 'collect2', text: 'Collect eggs from Coop 1 again', sub: 'Walk past the nest crate' },
     { id: 'ride', text: 'Hop on the bike', sub: 'Press E (or tap the prompt) next to it' },
-    { id: 'sell', text: 'Sell your eggs at the egg stand', sub: 'Ride to the stand counter: customers buy what you stock' },
+    { id: 'market', text: 'Sell your eggs at the town market', sub: 'Ride east along the road into the SELL HERE zone' },
     { id: 'coop2', text: 'Buy Coop 2', sub: 'Stand on its build pad' },
     { id: 'office', text: 'Buy the Farm Office', sub: 'Stand on its build pad by the cottage to hire workers' },
   ],
