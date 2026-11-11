@@ -106,7 +106,7 @@ export function createHud({ farm, actions }) {
   }
   const goalMin = button('goal-min', '−', () => showGoal(false))
   goalMin.setAttribute('aria-label', 'Minimize goal')
-  const goalTab = button('goal-tab hide', '<span>GOAL</span>', () => showGoal(true, 9000))
+  const goalTab = button('goal-tab hide', '<span>GOAL</span>', () => showGoal(true))
   goalTab.setAttribute('aria-label', 'Show the next goal')
   goal.append(goalIco, goalText, goalStep, goalMin)
   // A picture shows only when the goal is a vehicle (its bay is built); otherwise no icon.
@@ -544,7 +544,7 @@ export function createHud({ farm, actions }) {
     const seen = next ? `${next.id}:${need <= 0}` : null
     if (seen !== goalSeen) {
       goalSeen = seen
-      if (seen) showGoal(true, 8000) // a new goal, or it just became affordable
+      if (seen) showGoal(true) // a new goal, or it just became affordable: stays maximized until the player minimizes it
     }
     goalStep.textContent = `${st.built.length + st.plots.owned.length}/${GAME.buildings.length + GAME.plots.max}`
     paintHotbar()
