@@ -164,6 +164,7 @@ Object.assign(ICONS, {
   duckEgg: svg(`<ellipse cx="32" cy="34" rx="16" ry="21" fill="#cfe6d8" ${O}/><ellipse cx="26" cy="26" rx="4" ry="6" fill="#ffffff" opacity="0.7"/>`),
   build: svg(`<path d="M10 54 H54" stroke="#3a1f0e" stroke-width="4"/><rect x="14" y="30" width="36" height="24" fill="#f2c230" ${O}/><path d="M10 32 L32 12 L54 32 Z" fill="#d6322c" ${O}/><rect x="28" y="40" width="9" height="14" fill="#7b4a26" ${O}/>`),
 })
+ICONS.flower = svg(`<path d="M32 36 V56" stroke="#2f8a3a" stroke-width="4"/><circle cx="32" cy="22" r="7" fill="#f2c230" ${O}/><circle cx="32" cy="10" r="6" fill="#f06aa0" ${O}/><circle cx="43" cy="18" r="6" fill="#f06aa0" ${O}/><circle cx="43" cy="30" r="6" fill="#f06aa0" ${O}/><circle cx="21" cy="30" r="6" fill="#f06aa0" ${O}/><circle cx="21" cy="18" r="6" fill="#f06aa0" ${O}/><circle cx="32" cy="22" r="6" fill="#f2c230" ${O}/><path d="M32 46 Q22 40 18 46 Q24 52 32 46 Z" fill="#3fae4a" ${O}/>`)
 ICONS.rancher = worker('#8a5a3a', STRAW, `<rect x="20" y="30" width="6" height="14" rx="2" fill="#ffffff" ${O}/><rect x="38" y="30" width="6" height="14" rx="2" fill="#ffffff" ${O}/>`)
 ICONS.oiler = worker('#f2a03a', CAP('#f2c230'), `<ellipse cx="32" cy="38" rx="8" ry="10" fill="#2b2b2b" ${O}/>`)
 ICONS.driver = ICONS.truck

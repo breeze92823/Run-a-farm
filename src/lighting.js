@@ -130,11 +130,13 @@ export function createLighting(scene, renderer, preset) {
 
   // --- Lamps (none placed right now) ---
   const lamps = [] // { light, bulb }
-  function addLamp(x, y, z, bulbMaterial) {
+  // `on()` (optional): whether the lamp stands at all (one in a building not bought yet stays dark;
+  // call refreshLamps() when that changes).
+  function addLamp(x, y, z, bulbMaterial, on = null) {
     const light = new PointLight(LIGHT.lampColor, 0, LIGHT.lampDistance, 2)
     light.position.set(x, y, z)
     scene.add(light)
-    lamps.push({ light, bulb: bulbMaterial })
+    lamps.push({ light, bulb: bulbMaterial, on })
     apply()
     return light
   }
@@ -185,7 +187,7 @@ export function createLighting(scene, renderer, preset) {
     skyMaterial.uniforms.sunDir.value.copy(dir)
     const lampLevel = lerp(D.lampIntensity, N.lampIntensity, t)
     for (const lamp of lamps) {
-      lamp.light.intensity = lampLevel
+      lamp.light.intensity = lamp.on && !lamp.on() ? 0 : lampLevel
       lamp.bulb.emissiveIntensity = 0.3 + (lampLevel / N.lampIntensity) * 3
     }
   }
@@ -196,6 +198,7 @@ export function createLighting(scene, renderer, preset) {
   return {
     sun,
     addLamp,
+    refreshLamps: apply, // a lamp's `on()` changed (its building was bought)
     isNight: () => target === 1,
     nightLevel: () => night, // 0 = day .. 1 = night, eased
     // A world's sky { day, night } (WORLDS): swapped at once, keeping day or night as it is.

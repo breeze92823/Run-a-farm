@@ -105,45 +105,53 @@ function seedStall(root) {
 export function buildMarket(root, { addLamp }) {
   const rand = mulberry32(6161)
   gated(root, 'seedMarket', (G) => seedStall(G), 5)
-  const g = new Group()
-  // Lamp posts at the four plaza corners, lit at night.
-  const corners = [
-    [P.minX + 2, P.maxZ - 2],
-    [P.maxX - 2, P.maxZ - 2],
-    [P.minX + 2, P.minZ + 6],
-    [P.maxX - 2, P.minZ + 6],
-  ]
-  for (const [x, z] of corners) {
-    const [bx, by, bz] = lampPost(g, x, z, 3.8)
-    addLamp(bx, by, bz)
-    solidCyl(0.2, 3.8, x, z)
-    pumpkin(g, x + 0.6, z + 0.4, 0.32)
-    pumpkin(g, x - 0.5, z + 0.6, 0.24, '#f6b13b')
-    flowerBox(g, x, z - 1.1, 1.2, 0, rand)
-  }
-  // Potted shrubs along the field side.
-  for (let z = P.minZ + 4; z < P.maxZ - 3; z += 6) {
-    cyl(g, 0.4, 0.3, 0.55, M('#b65a32'), P.minX + 0.6, 0.3, z, 12)
-    const bush = cyl(g, 0.45, 0.5, 0.6, M('#4f9a3a', { flatShading: true }), P.minX + 0.6, 0.9, z, 7)
-    bush.scale.set(1, 1.1, 1)
-  }
-  // Benches facing the plaza centre.
-  for (const [x, z, ry] of [[P.maxX - 1.2, -46, -Math.PI / 2], [P.maxX - 1.2, -34, -Math.PI / 2]]) {
-    const b = new Group()
-    b.position.set(x, 0.04, z)
-    b.rotation.y = ry
-    block(b, 2.2, 0.1, 0.6, M('#b67a42'), 0, 0.45, 0)
-    block(b, 2.2, 0.5, 0.08, M('#b67a42'), 0, 0.6, -0.28)
-    for (const s of [-0.9, 0.9]) block(b, 0.1, 0.45, 0.55, M('#2f2f33', { metalness: 0.4 }), s, 0, 0)
-    g.add(b)
-    solid(0.4, 0.5, 1.1, x, 0.5, z)
-  }
-  // A sandwich-board pointing to the barn.
-  const arrow = signCanvas(320, 120, { bg: '#2f5d3a', border: '#f5efd6', borderWidth: 6, radius: 10, lines: [{ text: 'STORAGE ➜', size: 54, color: '#f5efd6' }] })
-  block(g, 0.1, 1.4, 0.1, M('#6e4122'), P.maxX + 1.5, 0, -30)
-  box(g, 1.4, 0.52, 0.08, M('#2f5d3a'), P.maxX + 1.5, 1.5, -30)
-  signPanel(g, 1.38, 0.5, signMaterial(arrow), P.maxX + 1.5, 1.5, -29.95)
-  bakeInto(root, g)
+  // The plaza's dressing (lamp posts, pumpkins, flower boxes, shrubs, benches) is bought with the
+  // Seed Market too: until then the plaza is lawn.
+  gated(root, 'seedMarket', (G) => {
+    const g = new Group()
+    // Lamp posts at the four plaza corners, lit at night.
+    const corners = [
+      [P.minX + 2, P.maxZ - 2],
+      [P.maxX - 2, P.maxZ - 2],
+      [P.minX + 2, P.minZ + 6],
+      [P.maxX - 2, P.minZ + 6],
+    ]
+    for (const [x, z] of corners) {
+      const [bx, by, bz] = lampPost(g, x, z, 3.8)
+      addLamp(bx, by, bz)
+      solidCyl(0.2, 3.8, x, z)
+      pumpkin(g, x + 0.6, z + 0.4, 0.32)
+      pumpkin(g, x - 0.5, z + 0.6, 0.24, '#f6b13b')
+      flowerBox(g, x, z - 1.1, 1.2, 0, rand)
+    }
+    // Potted shrubs along the field side.
+    for (let z = P.minZ + 4; z < P.maxZ - 3; z += 6) {
+      cyl(g, 0.4, 0.3, 0.55, M('#b65a32'), P.minX + 0.6, 0.3, z, 12)
+      const bush = cyl(g, 0.45, 0.5, 0.6, M('#4f9a3a', { flatShading: true }), P.minX + 0.6, 0.9, z, 7)
+      bush.scale.set(1, 1.1, 1)
+    }
+    // Benches facing the plaza centre.
+    for (const [x, z, ry] of [[P.maxX - 1.2, -46, -Math.PI / 2], [P.maxX - 1.2, -34, -Math.PI / 2]]) {
+      const b = new Group()
+      b.position.set(x, 0.04, z)
+      b.rotation.y = ry
+      block(b, 2.2, 0.1, 0.6, M('#b67a42'), 0, 0.45, 0)
+      block(b, 2.2, 0.5, 0.08, M('#b67a42'), 0, 0.6, -0.28)
+      for (const s of [-0.9, 0.9]) block(b, 0.1, 0.45, 0.55, M('#2f2f33', { metalness: 0.4 }), s, 0, 0)
+      g.add(b)
+      solid(0.4, 0.5, 1.1, x, 0.5, z)
+    }
+    bakeInto(G, g)
+  }, 4.5)
+  // A sandwich-board pointing to the barn: it stands once the Storage Barn does.
+  gated(root, 'storage', (G) => {
+    const g = new Group()
+    const arrow = signCanvas(320, 120, { bg: '#2f5d3a', border: '#f5efd6', borderWidth: 6, radius: 10, lines: [{ text: 'STORAGE ➜', size: 54, color: '#f5efd6' }] })
+    block(g, 0.1, 1.4, 0.1, M('#6e4122'), P.maxX + 1.5, 0, -30)
+    box(g, 1.4, 0.52, 0.08, M('#2f5d3a'), P.maxX + 1.5, 1.5, -30)
+    signPanel(g, 1.38, 0.5, signMaterial(arrow), P.maxX + 1.5, 1.5, -29.95)
+    bakeInto(G, g)
+  }, 2)
 
   // The shopkeeper.
   const keeper = makeNPC({ shirt: '#5fae4a', pants: '#5b4636', apron: '#e9d8b4', hat: 'straw', hair: '#3a2416', skin: '#e6b48c' })

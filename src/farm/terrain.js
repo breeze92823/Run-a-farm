@@ -47,10 +47,10 @@ function outside(x, z) {
   const dx = Math.max(f.minX - x, 0, x - f.maxX)
   const dz = Math.max(f.minZ - z, 0, z - f.maxZ)
   let d = Math.hypot(dx, dz)
-  // The town (and the houses across its road) stays flat too.
-  const T = FARM.town
-  const tx = Math.max(T.minX - x, 0, x - (T.maxX + 12))
-  const tz = Math.max(0 - z, 0, z - (T.maxZ + 8))
+  // The town hub (the town and the three farm slots around it) stays flat too.
+  const H = FARM.hub
+  const tx = Math.max(H.minX - x, 0, x - (H.maxX + 10))
+  const tz = Math.max(H.minZ - 10 - z, 0, z - (H.maxZ + 10))
   d = Math.min(d, Math.hypot(tx, tz) * 1.6)
   // The road and railway valleys stay flat (a gentle bank on each side).
   for (const c of FARM.corridors) {
@@ -233,18 +233,32 @@ export function buildTerrain(root) {
   roadMesh.material.map.repeat.set((road.maxX - road.minX) / 9, 1)
   addSurface(road, 'asphalt')
 
-  // Sidewalks (raised) on both sides; the south one breaks for the side road.
+  // Sidewalks (raised) on both sides; the south one breaks for the side road, both for Main
+  // Street, which has its own sidewalks through the town.
   const SR = F.sideRoad
   const sx0 = SR.x - SR.width / 2 - 3
   const sx1 = SR.x + SR.width / 2 + 3
+  const MS = F.mainStreet
+  const mx0 = MS.x - MS.width / 2 - 3
+  const mx1 = MS.x + MS.width / 2 + 3
+  const T = F.town
   const southWalks = [
     { ...F.sidewalkS, maxX: sx0 },
-    { ...F.sidewalkS, minX: sx1 },
+    { ...F.sidewalkS, minX: sx1, maxX: mx0 },
+    { ...F.sidewalkS, minX: mx1 },
     { minX: sx0, maxX: sx0 + 3, minZ: F.sidewalkS.maxZ, maxZ: SR.maxZ },
     { minX: sx1 - 3, maxX: sx1, minZ: F.sidewalkS.maxZ, maxZ: SR.maxZ },
+    // Main Street's sidewalks: north of the road up to the town's edge, south of it down to the town's edge.
+    { minX: mx0, maxX: mx0 + 3, minZ: T.minZ + 4, maxZ: F.sidewalkN.minZ },
+    { minX: mx1 - 3, maxX: mx1, minZ: T.minZ + 4, maxZ: F.sidewalkN.minZ },
+    { minX: mx0, maxX: mx0 + 3, minZ: F.sidewalkS.maxZ, maxZ: T.maxZ - 4 },
+    { minX: mx1 - 3, maxX: mx1, minZ: F.sidewalkS.maxZ, maxZ: T.maxZ - 4 },
   ]
-  slab(root, F.sidewalkN, F.curbHeight, sidewalk, 4)
-  addSurface(F.sidewalkN, 'concrete')
+  for (const w of [{ ...F.sidewalkN, maxX: mx0 }, { ...F.sidewalkN, minX: mx1 }]) {
+    slab(root, w, F.curbHeight, sidewalk, 4)
+    addSurface(w, 'concrete')
+    solidRect(w.minX, w.maxX, w.minZ, w.maxZ, F.curbHeight)
+  }
   for (const w of southWalks) {
     slab(root, w, F.curbHeight, sidewalk, 4)
     addSurface(w, 'concrete')
@@ -261,6 +275,19 @@ export function buildTerrain(root) {
   sideMesh.geometry = sideGeo
   sideMesh.material.map.repeat.set((side.maxZ - side.minZ) / 9, 1)
   addSurface(side, 'asphalt')
+  // Main Street: north from the north farm's gate (over the rail crossing) to the south farm's gate.
+  const R = F.rail
+  for (const [z0, z1] of [[MS.minZ, R.z - 3.4], [R.z + 3.4, road.minZ], [road.maxZ, MS.maxZ]]) {
+    const r = { minX: MS.x - MS.width / 2, maxX: MS.x + MS.width / 2, minZ: z0, maxZ: z1 }
+    const geo = new PlaneGeometry(z1 - z0, MS.width)
+    geo.rotateX(-Math.PI / 2)
+    geo.rotateY(Math.PI / 2)
+    const m = patch(root, r, 0.032, roadTex, 9)
+    m.geometry.dispose()
+    m.geometry = geo
+    m.material.map.repeat.set((z1 - z0) / 9, 1)
+    addSurface(r, 'asphalt')
+  }
 
   // The wide dirt road north of the plot.
   const dirtRoad = tex(paintDirt(512, '#9c7550', '#7a5638', 941), 1)
@@ -307,7 +334,6 @@ export function buildTerrain(root) {
 
   // --- Colliders -------------------------------------------------------------------------
   solid(2000, 0.5, 2000, 0, -0.5, 0) // the ground
-  solidRect(F.sidewalkN.minX, F.sidewalkN.maxX, F.sidewalkN.minZ, F.sidewalkN.maxZ, F.curbHeight)
   // Walls around the walkable area (the hills are scenery).
   const W = F.walk
   const h = 30
@@ -320,13 +346,14 @@ export function buildTerrain(root) {
   solidRect(WW.minX - 1, WW.maxX, WW.minZ - 1, WW.minZ, h)
   solidRect(WW.minX - 1, WW.maxX, WW.maxZ, WW.maxZ + 1, h)
   solidRect(WW.minX - 1, WW.minX, WW.minZ, WW.maxZ, h)
-  // East: open where the road runs on into town; the town has its own walls.
-  const T = F.town
-  solidRect(W.maxX, W.maxX + 1, W.minZ, T.minZ, h)
-  solidRect(W.maxX, W.maxX + 1, T.maxZ, W.maxZ, h)
-  solidRect(W.maxX, T.maxX + 1, T.minZ - 1, T.minZ, h)
-  solidRect(W.maxX, T.maxX + 1, T.maxZ, T.maxZ + 1, h)
-  solidRect(T.maxX, T.maxX + 1, T.minZ, T.maxZ, h)
+  // East: open where the road runs on into town (z 26..104); the hub (the town and the farms
+  // around it) has its own walls.
+  const H = F.hub
+  solidRect(W.maxX, W.maxX + 1, Math.min(W.minZ, H.minZ), 26, h)
+  solidRect(W.maxX, W.maxX + 1, 104, Math.max(W.maxZ, H.maxZ), h)
+  solidRect(H.minX, H.maxX + 1, H.minZ - 1, H.minZ, h)
+  solidRect(H.minX, H.maxX + 1, H.maxZ, H.maxZ + 1, h)
+  solidRect(H.maxX, H.maxX + 1, H.minZ, H.maxZ, h)
 
   // --- Fallen leaves -------------------------------------------------------------------------
   // Thick on the road edges and lawn south of the road, sparser on the plot.

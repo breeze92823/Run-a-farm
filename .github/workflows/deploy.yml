@@ -2,11 +2,15 @@ name: Deploy to Bloxity
 
 # Builds the frontend and uploads it to Bloxity Hosting (https://hosting.bloxity.io/docs).
 # main -> prod channel (https://<gameId>.play.bloxity.io), dev -> dev channel.
-# Needs LEGION_GAME_ID (variable or secret) and LEGION_DEPLOY_TOKEN (secret).
+# The game id is the slug (GAME_SLUG in src/config.js), used as the folder/game name on Bloxity.
+# Needs LEGION_DEPLOY_TOKEN (secret). LEGION_GAME_ID (variable or secret) optionally overrides the slug.
 on:
   push:
     branches: [main, dev]
   workflow_dispatch:
+
+env:
+  GAME_SLUG: run-a-farm
 
 concurrency:
   group: deploy-${{ github.ref_name }}
@@ -36,8 +40,8 @@ jobs:
 
       - name: Validate deploy config
         run: |
-          if [ -z "${GAME_ID}" ]; then
-            echo "::error::LEGION_GAME_ID is not set (Settings > Secrets and variables > Actions)."
+          if ! grep -q "GAME_SLUG = '${GAME_SLUG}'" src/config.js; then
+            echo "::error::GAME_SLUG in src/config.js is not '${GAME_SLUG}'."
             exit 1
           fi
           if [ -z "${DEPLOY_TOKEN}" ]; then
@@ -45,12 +49,11 @@ jobs:
             exit 1
           fi
         env:
-          GAME_ID: ${{ vars.LEGION_GAME_ID || secrets.LEGION_GAME_ID }}
           DEPLOY_TOKEN: ${{ secrets.LEGION_DEPLOY_TOKEN }}
 
       - name: Build
         # VITE_DEV_MODE is deliberately unset so deployed builds use the real Bloxity SDK/CDN.
-        # No server URL: built games always reach Bowling-roll-backend through the
+        # No server URL: built games always reach Run-a-farm-backend through the
         # Bloxity matchmaker (Legion.SDK.net.resolveEndpoint in src/bloxity.js).
         run: |
           if [ "${{ steps.channel.outputs.channel }}" = "prod" ]; then
@@ -65,7 +68,7 @@ jobs:
       - name: Upload to Bloxity
         run: |
           curl -sS -f -X POST \
-            "https://api.bloxity.io/v1/hosting/games/${{ vars.LEGION_GAME_ID || secrets.LEGION_GAME_ID }}/frontend?channel=${{ steps.channel.outputs.channel }}&version=${{ github.sha }}" \
+            "https://api.bloxity.io/v1/hosting/games/${{ vars.LEGION_GAME_ID || secrets.LEGION_GAME_ID || env.GAME_SLUG }}/frontend?channel=${{ steps.channel.outputs.channel }}&version=${{ github.sha }}" \
             -H "Authorization: Bearer ${{ secrets.LEGION_DEPLOY_TOKEN }}" \
             -H "Content-Type: application/zip" \
             --data-binary @build.zip \

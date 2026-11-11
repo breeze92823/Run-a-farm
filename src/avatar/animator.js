@@ -155,6 +155,13 @@ class PlayerAnimator {
         break
       }
     }
+    // Holding something (held.js): both arms forward and a little inward, carrying it at the chest.
+    if (input.carry && this.state !== 'ride') {
+      t.set('ArmL1', -1.05, 0, -0.7)
+      t.set('ArmR1', -1.05, 0, 0.7)
+      t.set('ArmL2', 0)
+      t.set('ArmR2', 0)
+    }
   }
 
   // One cycle at two depths (walk -> run), derived from actual speed.

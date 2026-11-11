@@ -15,8 +15,9 @@ import {
 } from 'three'
 import { FARM, inWalk } from '../config.js'
 import { mulberry32 } from '../textures.js'
-import { E, M, bakeInto, block, box, cyl, gableRoof, inRect, prism, solidCyl, solidRect } from './kit.js'
+import { E, M, bakeInto, block, box, cyl, gableRoof, gated, inRect, prism, solidCyl, solidRect } from './kit.js'
 import { fence } from './fence.js'
+import { boundary } from './boundary.js'
 import { lampPost } from './props.js'
 import { groundHeight } from './terrain.js'
 
@@ -35,7 +36,7 @@ function blocked(x, z) {
   if (z > F.railFenceN - 3 && z < F.dirtRoad.maxZ + 2) return true // dirt road + railway
   if (x > -72 && x < F.east.maxX + 3 && z > F.northEdge - 4 && z < F.sidewalkN.minZ) return true // the plot itself
   if (inRect(x, z, F.ranch, 2)) return true // the ranch places its own trees
-  if (inRect(x, z, { minX: F.town.minX - 4, maxX: F.town.maxX + 14, minZ: 0, maxZ: F.town.maxZ + 10 })) return true // the town
+  if (inRect(x, z, F.hub, 4)) return true // the town and the farms around it
   if (inRect(x, z, F.homestead, 1)) return true // cottage, pumpkin patch
   if (inRect(x, z, F.park, 3)) return true // the Processing Park
   if (z > F.sidewalkN.minZ && Math.abs(x - F.sideRoad.x) < F.sideRoad.width / 2 + 6) return true // side road
@@ -70,6 +71,8 @@ function buildTrees(root, rand) {
   for (let i = 0; i < 110; i++) place(74 + rand() * 80, -130 + rand() * 170)
   for (let i = 0; i < 90; i++) place(-170 + rand() * 60, -130 + rand() * 170)
   for (let i = 0; i < 90; i++) place(-170 + rand() * 340, -170 + rand() * 70)
+  // Woods all round the town hub (its farms end at the tree line).
+  for (let i = 0; i < 700; i++) place(150 + rand() * 580, -420 + rand() * 880)
   // Around the Processing Park (west of the plot): behind it, and between it and the neighbour's farm.
   for (let i = 0; i < 80; i++) place(-345 + rand() * 180, -130 + rand() * 74)
   for (let i = 0; i < 110; i++) place(-430 + rand() * 88, -110 + rand() * 146)
@@ -189,26 +192,46 @@ function buildBushes(root, rand) {
   root.add(mesh)
 }
 
-function plotFences() {
-  // The plot's north fence, with an opening onto the dirt road, and its east/west ends.
-  const N = FARM.northEdge
-  const G = FARM.northGate
-  fence([[FARM.westPath.maxX, N], [G.minX, N]], 'wood') // west of here, west.js fences the plots
-  fence([[G.maxX, N], [FARM.east.maxX, N], [FARM.east.maxX, FARM.east.maxZ], [FARM.dropOff.maxX + 1.5, FARM.east.maxZ]], 'wood')
+function plotFences(root) {
+  // The farm's boundary: one wood fence round the whole plot (FARM.boundary) with a gateway
+  // wherever a track, path or drive leaves it.
+  const B = FARM.boundary
+  const W = FARM.west
+  const cw = (W.maxX - W.minX - W.gap * (W.cols - 1)) / W.cols
+  const north = [[FARM.westPath.minX, FARM.westPath.maxX], [FARM.northGate.minX, FARM.northGate.maxX], [FARM.oil.gate.minX, FARM.oil.gate.maxX]]
+  for (let c = 1; c < W.cols; c++) north.push([W.maxX - c * (cw + W.gap), W.maxX - c * (cw + W.gap) + W.gap]) // tracks between the plot columns
+  const south = [
+    [FARM.housePath.minX - 0.5, FARM.housePath.maxX + 0.5],
+    [FARM.homePath.minX - 0.5, FARM.homePath.maxX + 0.5],
+    [FARM.standPlaza.minX, FARM.standPlaza.maxX], // the stand's customers walk in off the road
+    [FARM.driveway.minX, FARM.dropOff.minX + 6], // the truck driveway and the barn yard's walk-in
+  ]
+  const west = [[FARM.path.minZ - 0.5, FARM.path.maxZ + 0.5], [FARM.parkLane.minZ, FARM.parkLane.maxZ]] // into the Processing Park
+  const g = new Group()
+  boundary(g, [[B.minX, B.minZ], [B.maxX, B.minZ], [B.maxX, B.maxZ], [B.minX, B.maxZ]], [
+    north.map(([a, b]) => [a - B.minX, b - B.minX]),
+    [],
+    south.map(([a, b]) => [B.maxX - b, B.maxX - a]),
+    west.map(([a, b]) => [B.maxZ - b, B.maxZ - a]),
+  ])
+  bakeInto(root, g)
   // Far ranch fences on the hill pastures beyond the ranch.
   fence([[-200, -300], [-60, -296], [80, -302], [200, -296]], 'white', { collide: false })
   fence([[-60, -296], [-66, -380]], 'white', { collide: false })
 }
 
+// The street lamps along the road past the farm: the Street Lamps decor pad (FARM.pads).
 function streetLamps(root, addLamp) {
-  const g = new Group()
-  for (let x = -120; x <= 120; x += 30) {
-    const z = FARM.sidewalkS.minZ + 1
-    const [bx, by, bz] = lampPost(g, x, z, 5.6, 'street')
-    if (Math.abs(x) <= 60) addLamp(bx, by, bz)
-    solidCyl(0.18, 5, x, z)
-  }
-  bakeInto(root, g)
+  gated(root, 'pad:Street Lamps', (G) => {
+    const g = new Group()
+    for (let x = -120; x <= 120; x += 30) {
+      const z = FARM.sidewalkS.minZ + 1
+      const [bx, by, bz] = lampPost(g, x, z, 5.6, 'street')
+      if (Math.abs(x) <= 60) addLamp(bx, by, bz)
+      solidCyl(0.18, 5, x, z)
+    }
+    bakeInto(G, g)
+  }, 6)
 }
 
 // --- Wind turbines ------------------------------------------------------------------------
@@ -223,6 +246,7 @@ function turbines(root, rand) {
   const bladeGeo = new BoxGeometry(0.9, 26, 0.25)
   bladeGeo.translate(0, 13, 0)
   for (const [x, z] of spots) {
+    if (inRect(x, z, FARM.hub, 30)) continue // not on the town's farms
     const y = groundHeight(x, z)
     const g = new Group()
     g.position.set(x, y, z)
@@ -300,7 +324,7 @@ export function buildScenery(root, { addLamp }) {
   const rand = mulberry32(9090)
   buildTrees(root, rand)
   buildBushes(root, rand)
-  plotFences()
+  plotFences(root)
   streetLamps(root, addLamp)
   const mills = turbines(root, rand)
   const bal = balloon()

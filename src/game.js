@@ -36,12 +36,12 @@ const fresh = () => ({
   cartons: 0,
   eggPrice: GAME.eggPrice,
   customersPerMin: GAME.customersPerMin,
-  seeds: GAME.seeds.map((s, i) => ({ id: s.id, count: i === 0 ? 5 : 0, unlocked: i === 0 })),
+  seeds: GAME.seeds.map((s, i) => ({ id: s.id, count: 0, unlocked: i === 0 })), // no free seeds: buy them at the Seed Market
   selected: 0,
   upgrades: {}, // shop item id -> level
   pads: [], // names of bought decor pads
   built: [], // building ids
-  plots: { owned: [], up: {}, grow: {}, crop: {} }, // owned plot numbers; plot -> upgrades; plot -> 0..1; plot -> seed id | null
+  plots: { owned: [], up: {}, grow: {}, crop: {}, picked: {} }, // owned plot numbers; plot -> upgrades; plot -> 0..1; plot -> seed id | null; plot -> picked plant indices
   workers: {}, // worker id -> hired
   vehicles: {}, // vehicle id -> bought
   garage: {}, // garage upgrade id -> level
@@ -181,7 +181,32 @@ export function resetProgress() {
 }
 
 // --- Money ----------------------------------------------------------------------------------
-export const moneyBoost = () => GAME.boosts.reduce((s, b) => s + b.amount, 0) + mods.boost()
+// The two HUD boosts are earned through invites (net.js keeps this in step with the server's
+// `invite` answer; backend invite.ts): the Money Boost once the player has sent an invite (a direct
+// Bloxity invite or the shared invite link), the Friends Boost once an invited friend actually
+// joined. Kept outside `state` so a reset / prestige never takes them away; remembered per browser
+// for offline play.
+const INVITE_KEY = 'run-a-farm.invite.v1'
+export const invite = (() => {
+  const base = { moneyBoost: false, friendsBoost: false, joined: 0, guest: true }
+  try {
+    return { ...base, ...JSON.parse(localStorage.getItem(INVITE_KEY) || '{}') }
+  } catch {
+    return base
+  }
+})()
+export function setInvite(next) {
+  Object.assign(invite, next)
+  try {
+    localStorage.setItem(INVITE_KEY, JSON.stringify(invite))
+  } catch {
+    // Storage blocked: this session only.
+  }
+  changed()
+  emit('invite', invite)
+}
+export const boostActive = (b) => (b.id === 'money' ? invite.moneyBoost : b.id === 'friends' ? invite.friendsBoost : true)
+export const moneyBoost = () => GAME.boosts.reduce((s, b) => s + (boostActive(b) ? b.amount : 0), 0) + mods.boost()
 const moonK = () => (moon.active ? GAME.moon.bonus : 1)
 // What a customer pays for one egg at the stand right now (boosts, Harvest Moon).
 export const eggSalePrice = () => Math.round(state.eggPrice * (1 + moneyBoost()) * moonK())
@@ -299,12 +324,12 @@ export function buyBuilding(b) {
 }
 // The next thing to save up for: the cheapest building or field for sale now.
 export function nextGoal() {
-  const list = GAME.buildings.filter(buildingReady).map((b) => ({ name: b.name, price: b.price }))
+  const list = GAME.buildings.filter((b) => buildingReady(b) && b.kind !== 'STAND DECOR').map((b) => ({ id: b.id, name: b.name, price: b.price }))
   const p = nextPlot()
-  if (p && plotForSale(p)) list.push({ name: `Field ${p.n}`, price: p.price })
-  for (const v of GAME.vehicles) if (built(v.needs) && vehicleCount(v) === 0) list.push({ name: `a ${v.name}`, price: vehiclePrice(v) })
-  if (built('droneBase') && state.drones.n === 0) list.push({ name: 'a Drone', price: dronePrice() })
-  if (built('oilField') && state.oil.pumps === 0) list.push({ name: 'a Pump Jack', price: pumpPrice() })
+  if (p && plotForSale(p)) list.push({ id: 'field', name: `Field ${p.n}`, price: p.price })
+  for (const v of GAME.vehicles) if (built(v.needs) && vehicleCount(v) === 0) list.push({ id: v.id, name: `a ${v.name}`, price: vehiclePrice(v) })
+  if (built('droneBase') && state.drones.n === 0) list.push({ id: 'drone', name: 'a Drone', price: dronePrice() })
+  if (built('oilField') && state.oil.pumps === 0) list.push({ id: 'pump', name: 'a Pump Jack', price: pumpPrice() })
   list.sort((a, b) => a.price - b.price)
   return list[0] ?? null
 }
@@ -318,9 +343,58 @@ export function selectSeed(i) {
     return
   }
   state.selected = i
+  if (state.seeds[i].count > 0) hold('seed', state.seeds[i].id)
   changed()
   emit('select', i)
 }
+
+// --- The hotbar and the item in the player's hands ---------------------------------------------------
+// The hotbar lists what the player carries: seed packs bought at the Seed
+// Market, then each good in the bag. `hand` is the item the avatar holds
+// (main.js `held.js`); it is not saved. Picking something up (eggs, a
+// harvest, a ranch crate) puts it in the hands; it is dropped once the bag
+// has none of it left.
+export const hand = { kind: null, id: null } // kind 'seed' | 'good'
+export function hotbarItems() {
+  const list = []
+  state.seeds.forEach((s, i) => s.unlocked && s.count > 0 && list.push({ kind: 'seed', id: s.id, i, count: s.count }))
+  for (const g of Object.keys(GAME.goods)) {
+    const n = state.bag.items[g] ?? 0
+    if (n > 0) list.push({ kind: 'good', id: g, count: n })
+  }
+  return list
+}
+export function hold(kind, id) {
+  if (hand.kind === kind && hand.id === id) return
+  hand.kind = kind
+  hand.id = id
+  emit('hold', hand)
+}
+export function selectHotbar(k) {
+  const it = hotbarItems()[k]
+  if (!it) return
+  if (it.kind === 'seed') return selectSeed(it.i)
+  hold('good', it.id)
+  changed()
+}
+// A good that just went up in the bag was picked up: hold it. The held item is
+// dropped once there is none of it left (then the next good in the bag, if any).
+const lastBag = { ...state.bag.items }
+function checkHand() {
+  let picked = null
+  for (const g in state.bag.items) if ((state.bag.items[g] ?? 0) > (lastBag[g] ?? 0)) picked = g
+  for (const g in lastBag) delete lastBag[g]
+  Object.assign(lastBag, state.bag.items)
+  if (picked) return hold('good', picked)
+  if (!hand.kind) return
+  const left = hand.kind === 'seed' ? state.seeds.find((s) => s.id === hand.id)?.count ?? 0 : state.bag.items[hand.id] ?? 0
+  if (left > 0) return
+  const next = hotbarItems().find((it) => it.kind === 'good')
+  hold(next ? 'good' : null, next ? next.id : null)
+}
+on('change', checkHand)
+on('reset', () => hold(null, null))
+
 export function buySeeds(i) {
   const def = GAME.seeds[i]
   const s = state.seeds[i]
@@ -381,8 +455,16 @@ const layEvery = () => GAME.layEvery / (1 + upgradeLevel('nests') * 0.15) / mods
 
 // --- Upgrade pads (decor) ---------------------------------------------------------------------------------
 export const padBought = (name) => state.pads.includes(name)
+// A decor pad is for sale once the buildings it `needs` stand (FARM.pads).
+export const padReady = (p) => !padBought(p.name) && (p.needs ?? []).every(built)
 export function buyPad(p) {
   if (padBought(p.name)) return false
+  const miss = (p.needs ?? []).find((id) => !built(id))
+  if (miss) {
+    emit('toast', { text: `Build the ${buildingById(miss)?.name ?? 'Field 1'} first`, kind: 'warn' })
+    emit('deny', {})
+    return false
+  }
   if (!spend(p.price, p.name)) return false
   state.pads.push(p.name)
   const m = /\+(\d+)% customers/.exec(p.perk)
@@ -408,6 +490,96 @@ export const plotCrop = (p) => state.plots.crop[p.n] ?? null
 const upStep = (p, id) => plotLevel(p, id) * (GAME.plots.upgrades.find((u) => u.id === id)?.step ?? 0)
 export const plotGrowTime = (p) => (seedDef(plotCrop(p) ?? 'wheat').grow) / (1 + upStep(p, 'sprinklers'))
 export const plotYield = (p) => Math.round(GAME.plots.yield[p.i] * (1 + upStep(p, 'fertilizer')))
+
+// --- Plants: a plot's crop is a grid of plants along its ridges (farm/plots.js draws one
+// clump per spot). The player harvests the plants within reach as they walk or drive
+// through (`pickPlants`), each giving its share of the field's yield; the field replants
+// once its last plant is picked. Workers take whatever is left in one go (`harvestPlot`).
+export const PICK_REACH = { foot: 2.4, tractor: 4.5, combine: 6 } // m: about 3 rows on foot (rows are FARM.fieldRow apart)
+export function plotSpots(p) {
+  if (p.spots) return p.spots
+  const c = p.crops
+  const rows = Math.floor((c.maxX - c.minX) / FARM.fieldRow)
+  const x0 = (c.minX + c.maxX) / 2 - ((rows - 1) * FARM.fieldRow) / 2
+  const jit = (k) => {
+    const v = Math.sin(k * 12.9898 + p.n * 78.233) * 43758.5453
+    return v - Math.floor(v) - 0.5
+  }
+  const spots = []
+  for (let i = 0; i < rows; i++) {
+    const x = x0 + i * FARM.fieldRow
+    for (let z = c.minZ + 0.6; z < c.maxZ - 0.4; z += 1) spots.push([x + jit(spots.length * 2) * 0.3, z + jit(spots.length * 2 + 1) * 0.25])
+  }
+  p.spots = spots
+  return spots
+}
+// The picked plants of a plot: the saved index list plus a Set for lookups (rebuilt when the list is replaced).
+const pickCache = new Map()
+export function plotPicked(p) {
+  let arr = state.plots.picked?.[p.n]
+  if (!arr) {
+    state.plots.picked ??= {}
+    arr = state.plots.picked[p.n] = []
+  }
+  let c = pickCache.get(p.n)
+  if (!c || c.arr !== arr) pickCache.set(p.n, (c = { arr, set: new Set(arr) }))
+  return c
+}
+const clearPicked = (p) => {
+  state.plots.picked[p.n] = []
+  p.run = null
+}
+// Goods for the k-th plant picked of n, out of `total` for the whole field (the first plant already gives one).
+const plantShare = (total, k, n) => Math.ceil((total * (k + 1)) / n) - Math.ceil((total * k) / n)
+function pickPlants(p, x, z, reach, { bonus = 0, by = null } = {}) {
+  const spots = plotSpots(p)
+  const N = spots.length
+  const pk = plotPicked(p)
+  const good = plotCrop(p) ?? 'wheat'
+  // A field's harvest run starts with its first plant: that is when a giant crop is rolled.
+  if (!p.run || pk.arr.length === 0) p.run = { n: 0, mult: Math.random() < GAME.rare.chance ? GAME.rare.giant : 1, bonus }
+  const total = Math.round(plotYield(p) * (1 + bonus) * p.run.mult)
+  const storeOk = built('storage')
+  const cut = []
+  let got = 0
+  for (let i = 0; i < N; i++) {
+    if (pk.set.has(i)) continue
+    const s = spots[i]
+    if ((s[0] - x) ** 2 + (s[1] - z) ** 2 > reach * reach) continue
+    const share = plantShare(total, pk.arr.length, N)
+    if (share > 0) {
+      const room = state.bag.max - bagCount() + (storeOk ? state.storage.max - storageCount() : 0)
+      if (room < share) {
+        if (!p.fullWarned) {
+          p.fullWarned = true
+          emit('toast', { text: storeOk ? 'No room: your bag and the storage are full!' : 'Your bag is full: sell or unload first', kind: 'warn' })
+          emit('deny', {})
+        }
+        break
+      }
+      const left = share - put(state.bag, good, share)
+      if (left > 0) put(state.storage, good, left)
+    }
+    p.fullWarned = false
+    pk.arr.push(i)
+    pk.set.add(i)
+    cut.push(i)
+    got += share
+  }
+  if (!cut.length) return
+  p.run.n += got
+  emit('pick', { p, cut, n: got, good, x, z })
+  if (pk.arr.length >= N) {
+    // The last plant: the field is done and replants.
+    const run = p.run
+    clearPicked(p)
+    state.plots.grow[p.n] = 0
+    plant(p, false)
+    changed()
+    emit('harvest', { p, n: run.n, good, by, k: 0, player: true, giant: run.mult > 1 })
+    emit('toast', { text: `Field ${p.n} harvested: ${run.n} ${GAME.goods[good].name}!`, kind: 'good' })
+  } else changed()
+}
 export const plotHarvest = (p) => marketValue({ [plotCrop(p) ?? 'wheat']: plotYield(p) })
 export function plotUpgradePrice(p, u) {
   return Math.round((Math.max(p.price, 600) * u.price * Math.pow(u.growth, plotLevel(p, u.id))) / 50) * 50
@@ -458,7 +630,10 @@ export function buyPlotUpgrade(p, u) {
 // either one overflowing into the other. Returns false if there is no room.
 export function harvestPlot(p, { by = null, k = 0, bonus = 0, player = false, mult = 1 } = {}) {
   const good = plotCrop(p) ?? 'wheat'
-  const n = Math.round(plotYield(p) * (1 + bonus) * mult)
+  // Plants the player already picked are gone: only the rest of the field's yield is left.
+  const full = Math.round(plotYield(p) * (1 + bonus) * mult)
+  const done = plotPicked(p).arr.length
+  const n = full - Math.ceil((full * done) / plotSpots(p).length)
   const storeOk = built('storage')
   const room = (player ? state.bag.max - bagCount() : 0) + (storeOk ? state.storage.max - storageCount() : 0)
   if (room < n) {
@@ -473,6 +648,7 @@ export function harvestPlot(p, { by = null, k = 0, bonus = 0, player = false, mu
   let left = n
   if (player) left -= put(state.bag, good, left)
   if (left > 0) put(state.storage, good, left)
+  clearPicked(p)
   state.plots.grow[p.n] = 0
   plant(p, !!by)
   changed()
@@ -1186,11 +1362,13 @@ export function tick(dt, player) {
       if (next >= 1) emit('ripe', p)
     } else if (m?.kind !== 'truck') {
       const c = p.crops
-      if (player.x > c.minX && player.x < c.maxX && player.z > c.minZ && player.z < c.maxZ) {
+      const e = 1.5 // the edge plants can be picked from just outside the crop too
+      if (player.x > c.minX - e && player.x < c.maxX + e && player.z > c.minZ - e && player.z < c.maxZ + e) {
         const tractor = m?.kind === 'tractor'
         const combine = m?.kind === 'combine'
         const bonus = tractor ? GAME.tractor.harvestBonus * (1 + garageStep('engine')) + garageStep('header') : combine ? GAME.fleet[0].bonus : 0
-        harvestPlot(p, { player: true, bonus, by: tractor ? 'player-tractor' : combine ? 'player-combine' : null, mult: Math.random() < GAME.rare.chance ? GAME.rare.giant : 1 })
+        const reach = tractor ? PICK_REACH.tractor : combine ? PICK_REACH.combine : PICK_REACH.foot
+        pickPlants(p, player.x, player.z, reach, { bonus, by: tractor ? 'player-tractor' : combine ? 'player-combine' : null })
       }
     }
   }

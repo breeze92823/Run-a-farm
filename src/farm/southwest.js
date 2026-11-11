@@ -386,11 +386,10 @@ export function buildSouthWest(root, { addLamp }) {
   pumpkinPatch(root, rand)
   addLamp?.(FARM.farmhouse.x + 0.95, 2.6, FARM.farmhouse.z + 4)
 
-  // Fences: along the road (gaps for the gravel walk and the dirt path) and down the woods side.
+  // The road side is the farm's boundary fence (gateways at the gravel walk and the dirt path);
+  // a fence down the woods side keeps the garden.
   const H = FARM.homestead
-  const fz = FARM.sidewalkN.minZ - 0.6
-  fence([[H.minX, fz], [FARM.housePath.minX - 0.5, fz]])
-  fence([[FARM.housePath.maxX + 0.5, fz], [FARM.homePath.minX - 0.5, fz]])
+  const fz = FARM.boundary.maxZ
   fence([[H.minX, fz], [H.minX, H.minZ + 6]])
   // A pallet, a bench and pumpkins by the road fence.
   const g = new Group()

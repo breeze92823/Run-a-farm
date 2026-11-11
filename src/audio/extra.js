@@ -145,7 +145,9 @@ function note(tr, z, t, m, len, lead) {
   void z
 }
 function zoneAt(x, z) {
-  if (x > FARM.town.minX - 10) return 'town'
+  const T = FARM.town
+  if (x > T.minX - 10 && x < T.maxX + 10 && z > T.minZ - 10 && z < T.maxZ + 10) return 'town'
+  if (x > T.minX - 10) return 'farm' // the other players' farms around the town
   if (z < FARM.rail.z - 4) return 'ranch'
   if (x > 76 && z < -50 && z > -100) return 'oil'
   return 'farm'

@@ -12,7 +12,7 @@ import { createWorld } from './world.js'
 import { buildFarm } from './farm/index.js'
 import { createHud } from './hud/hud.js'
 import { closeTopWindow } from './hud/window.js'
-import { selectSeed } from './game.js'
+import { hand, selectHotbar } from './game.js'
 import { mount } from './mount.js'
 import { getMode } from './modes.js'
 import * as audioCore from './audio/core.js'
@@ -21,7 +21,11 @@ import { setNeonBloom } from './propkit.js'
 import { buildDefaultCharacter, loadBaseCharacter } from './avatar/character.js'
 import { applyProportions, attachEquippedAccessories } from './avatar/loader.js'
 import { disposeAnimator, makeAnimator } from './avatar/animator.js'
-import { install as installNet } from './net.js'
+import { install as installNet, sendEmote, sendPose, setLook, setRide } from './net.js'
+import { createRemotePlayers } from './remotePlayers.js'
+import { EmotePlayer, captureBind } from './avatar/emotes.js'
+import { speechBubble } from './bubble.js'
+import { createHeld } from './held.js'
 import { installEcon, tickEcon } from './econ/index.js'
 import { skipToNext } from './econ/clock.js'
 
@@ -108,10 +112,14 @@ let avatar = null
 let animator = null
 let generation = 0
 let avatarReady = false
+const emote = new EmotePlayer() // the Bloxity emote we are playing (portal emote wheel)
+const held = createHeld(playerGroup) // the item in the player's hands (game.js `hand`)
 
 function setAvatar(next) {
   if (avatar) playerGroup.remove(avatar)
   disposeAnimator(animator)
+  captureBind(next) // emotes pose bones as deltas over the bind pose
+  emote.stop()
   avatar = next
   playerGroup.add(avatar)
   animator = makeAnimator(avatar)
@@ -145,6 +153,29 @@ bloxity.subscribeAuth((s) => {
 })
 bloxity.onAvatarChanged(loadAvatar)
 bloxity.onProportionsChanged(() => applyProportions(avatar, bloxity.getProportions()))
+
+// --- Multiplayer: our look for the others, the others themselves, emotes, chat -------------------
+// Our Bloxity look goes to the room as ids (signed in; a guest is the default character).
+const shareLook = () => (bloxity.authState.user ? setLook(bloxity.getEquippedAvatar(), bloxity.getProportions()) : setLook(null))
+bloxity.subscribeAuth(shareLook)
+bloxity.onAvatarChanged(shareLook)
+bloxity.onProportionsChanged(shareLook)
+const remotePlayers = createRemotePlayers(scene, { mapPose: farm.farm.remote?.mapPose })
+// Emotes from the portal's wheel: played on our avatar (standing, on foot) and relayed.
+bloxity.onEmote(async (id) => {
+  if (mount.active) return
+  const clip = (await bloxity.emoteClips()).get(id)
+  if (!clip) return // unknown ids are ignored quietly
+  emote.play(id, clip)
+  sendEmote(id)
+})
+// Chat: our own message as a bubble over our head (the others' in remotePlayers.js).
+let myBubble = null
+bloxity.onChat((m) => {
+  if (!m.isLocalPlayer) return
+  myBubble?.remove?.()
+  myBubble = speechBubble(playerGroup, m.text, 2.9)
+})
 bloxity.onRespawnRequest(goHome)
 
 // --- Modes + keys --------------------------------------------------------------
@@ -158,7 +189,7 @@ onKey('KeyN', skipToNext)
 onKey('KeyR', goHome)
 onKey('KeyE', () => hud.interact())
 onWorldClick((e, locked) => hud.click(e, locked))
-for (let i = 1; i <= 5; i++) onKey(`Digit${i}`, () => selectSeed(i - 1))
+for (let i = 1; i <= 9; i++) onKey(`Digit${i}`, () => selectHotbar(i - 1))
 installTouch({ mode: toggleMode, day: skipToNext, respawn: goHome })
 
 // --- Overview fly-over and photo mode (roadmap 7) ---------------------------------
@@ -248,7 +279,16 @@ function frame(dtOverride) {
     verticalVelocity: player.velocity.y,
     turn: 0,
     ride: seat === 'bike' ? 'bike' : seat ? 'seat' : null,
+    carry: !!hand.kind && !seat && !emote.active,
   })
+  // An emote plays over the idle pose and stops as soon as we move or get on something.
+  if (emote.active && (seat || Math.hypot(player.velocity.x, player.velocity.z) > 0.6 || !player.grounded)) {
+    emote.stop()
+    sendEmote('')
+  }
+  emote.update(avatar, dt)
+  held.update(avatar, hand, !seat && !emote.active)
+  setRide(mount.active?.kind ?? '', seat ?? '')
 
   updateCamera(camera, dt)
   if (cine) updateCine(dt, elapsed)
@@ -258,6 +298,11 @@ function frame(dtOverride) {
   }
   world.update(dt, elapsed)
   farm.update(dt, elapsed, player, camera)
+  remotePlayers.update(dt, elapsed, player.renderPosition, camera)
+  {
+    const rp = player.renderPosition
+    sendPose(rp.x, rp.y, rp.z, player.facing, Math.hypot(player.velocity.x, player.velocity.z))
+  }
   hud.update(dt, player.renderPosition, camera)
   tickEcon(dt, player)
   lighting.update(dt, playerGroup.position)
@@ -273,6 +318,19 @@ function frame(dtOverride) {
   }
 }
 renderer.setAnimationLoop(() => frame())
+// Ad breaks: the loop stops and the sound mutes until the break ends (Bloxity rule).
+let mutedBeforeAd = false
+bloxity.onAdBreak((on) => {
+  if (on) {
+    mutedBeforeAd = audioCore.isMuted()
+    audioCore.setMuted(true)
+    renderer.setAnimationLoop(null)
+  } else {
+    audioCore.setMuted(mutedBeforeAd)
+    clock.getDelta() // don't count the break as one huge frame
+    renderer.setAnimationLoop(() => frame())
+  }
+})
 
 window.addEventListener('beforeunload', bloxity.teardown)
 

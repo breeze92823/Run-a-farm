@@ -173,23 +173,27 @@ export function createHudExtras({ root, top, left, stats, button, popAt, toast, 
     }
     const B = FARM.contractBoard
     if (near(B.x, B.z, 4)) out.push({ x: B.x, z: B.z + 1.5, reach: 4, text: 'CONTRACTS BOARD', sub: `${game.state.contracts.list.length} open contracts`, run: () => openContracts() })
-    const MK = FARM.townMarket
-    if (near(MK.x + 13, 66, 3.5)) out.push({ x: MK.x + 13, z: 66, reach: 3.5, text: 'MARKET PRICES', sub: `Hot today: ${GAME.goods[hotItem()].name}`, run: () => openPrices() })
+    const PB = FARM.priceBoard
+    if (near(PB.x, PB.z, 3.5)) out.push({ x: PB.x, z: PB.z, reach: 3.5, text: 'MARKET PRICES', sub: `Hot today: ${GAME.goods[hotItem()].name}`, run: () => openPrices() })
     const m = mount.active
+    // Driving up in a vehicle with an engine: repair / refuel it on the spot (`drive`: hud.js
+    // offers these while riding, ahead of GET OFF). Only while there is work to do and the
+    // player can pay, so a full tank / sound engine (or an empty wallet) still lets E get off.
+    const driving = !!m && fleet.FUELLED.has(m.kind)
     if (game.built('workshop')) {
       const [wx, wz] = parkAt(FARM.workshop, 0, -7)
       if (near(wx, wz, 5)) {
-        if (m && fleet.FUELLED.has(m.kind)) out.push({ x: wx, z: wz, reach: 5, text: `REPAIR ${game.fmtMoney(fleet.repairCost(m.kind, m.k))}`, sub: `Wear ${Math.round(fleet.wearOf(m.kind, m.k) * 100)}%`, run: () => fleet.repair(m.kind, m.k) })
-        else out.push({ x: wx, z: wz, reach: 5, text: 'WORKSHOP', sub: 'Repair your vehicles', run: () => openWorkshop() })
+        const cost = driving ? fleet.repairCost(m.kind, m.k) : 0
+        if (driving && cost > 0 && cost <= game.state.money) out.push({ x: wx, z: wz, reach: 5, drive: true, text: `REPAIR ${game.fmtMoney(cost)}`, sub: `Wear ${Math.round(fleet.wearOf(m.kind, m.k) * 100)}%`, run: () => fleet.repair(m.kind, m.k) })
+        else if (!m) out.push({ x: wx, z: wz, reach: 5, text: 'WORKSHOP', sub: 'Repair your vehicles', run: () => openWorkshop() })
       }
     }
     if (game.built('fuelStation')) {
       const S = FARM.fuelStation
       if (near(S.x, S.z, 5.5)) {
-        if (m && fleet.FUELLED.has(m.kind)) {
-          const c = fleet.refuelCost(m.kind, m.k)
-          out.push({ x: S.x, z: S.z, reach: 5.5, text: `REFUEL ${c.cash ? game.fmtMoney(c.cash) : 'FREE'}`, sub: `Tank ${Math.round(fleet.fuelOf(m.kind, m.k))}/${GAME.fuel.tank} L`, run: () => fleet.refuel(m.kind, m.k) })
-        } else out.push({ x: S.x, z: S.z, reach: 5.5, text: 'FUEL STATION', sub: 'Fill your vehicles', run: () => openFuel() })
+        const c = driving ? fleet.refuelCost(m.kind, m.k) : null
+        if (c && c.need >= 0.5 && c.cash <= game.state.money) out.push({ x: S.x, z: S.z, reach: 5.5, drive: true, text: `REFUEL ${c.cash ? game.fmtMoney(c.cash) : 'FREE'}`, sub: `Tank ${Math.round(fleet.fuelOf(m.kind, m.k))}/${GAME.fuel.tank} L`, run: () => fleet.refuel(m.kind, m.k) })
+        else if (!m) out.push({ x: S.x, z: S.z, reach: 5.5, text: 'FUEL STATION', sub: 'Fill your vehicles', run: () => openFuel() })
       }
     }
     if (game.built('helipad')) {

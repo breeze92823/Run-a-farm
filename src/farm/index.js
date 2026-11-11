@@ -1,6 +1,7 @@
 import { Group } from 'three'
 import { AUDIO } from '../config.js'
-import { surfaceAt, updateWind } from './kit.js'
+import { currentGate, surfaceAt, updateWind } from './kit.js'
+import { buildDecor } from './decor.js'
 import { buildTerrain } from './terrain.js'
 import { buildFences } from './fence.js'
 import { buildChickenYard } from './chickens.js'
@@ -27,6 +28,7 @@ import { buildDrones } from './drones.js'
 import { buildOil } from './oil.js'
 import { buildRanch } from './ranch.js'
 import { buildTown } from './town.js'
+import { buildRemote } from './remote.js'
 import { env as rigEnv } from './rig.js'
 import { createFarmAudio } from '../audio/farm.js'
 import { buildPark } from './park.js'
@@ -52,8 +54,10 @@ export function buildFarm(scene, lighting, preset) {
   const addLamp = (x, y, z) => {
     if (lamps >= MAX_LAMPS) return null
     lamps++
+    // A lamp built into a gate (a building, a decor pad) only lights up once that is bought.
+    const gate = currentGate()
     // A tiny emissive bulb for the lighting module to brighten at night.
-    return lighting.addLamp(x, y, z, bulb)
+    return lighting.addLamp(x, y, z, bulb, gate ? () => gate.visible : null)
   }
   const bulb = { emissiveIntensity: 0 } // placeholder target: the real bulbs are emissive meshes
   const ctx = { addLamp }
@@ -72,6 +76,7 @@ export function buildFarm(scene, lighting, preset) {
   const southwest = buildSouthWest(root, ctx)
   const east = buildEast(root)
   const town = buildTown(root, ctx)
+  const remote = buildRemote(root)
   const scenery = buildScenery(root, ctx)
   buildFences(root)
   stringLights.build(root)
@@ -89,11 +94,15 @@ export function buildFarm(scene, lighting, preset) {
   const living = buildLiving(root, { particles })
   const fleet3d = buildFleet3d(root, { particles, rideables, parks, storage })
   rideables.register(ranch.horse)
+  buildDecor(root) // what the DECOR pads build (fountain, blossom trees, garden, playground, lanterns)
   const seasons = buildSeasons(root, { scenery, particles })
   // Last: every gated building has registered by now; the gates hide what is not bought.
   const gates = buildGates(root, { pads, particles })
   stand.attach({ pads, particles })
-  const farm = { yard, stand, field, truckBay, storage, market, pads, plots, parks, workers, north, scenery, west, southwest, east, town, rideables, van, drones, oil, ranch, gates, particles, park, living, seasons }
+  // Lamps in a building or decor just bought switch on (gates.js has shown them by now).
+  for (const ev of ['build', 'pad', 'plot', 'reset']) game.on(ev, () => lighting.refreshLamps?.())
+  lighting.refreshLamps?.() // the gates have just hidden what is not bought
+  const farm = { yard, stand, field, truckBay, storage, market, pads, plots, parks, workers, north, scenery, west, southwest, east, town, remote, rideables, van, drones, oil, ranch, gates, particles, park, living, seasons }
   const audio = createFarmAudio(farm)
   // The season we load into is painted at once.
   seasons.setSeason(clock.season)
@@ -138,7 +147,8 @@ export function buildFarm(scene, lighting, preset) {
       drones.update(dt, t)
       oil.update(dt, t)
       ranch.update(dt, t, focus)
-      town.update(dt, t)
+      town.update(dt, t, p)
+      remote.update(dt, t, p)
       gates.update(dt, t)
       north.update(dt, t)
       scenery.update(dt, t)

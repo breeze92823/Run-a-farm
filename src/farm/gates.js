@@ -28,9 +28,9 @@ export function buildGates(root, { pads, particles }) {
     pad: pads.add({ x: b.x, z: b.z, kind: b.kind, name: b.name, perk: b.perk, price: b.price, buy: () => game.buyBuilding(b) }),
   }))
   const rising = new Map() // id -> { t, entries, centre, size, dustT }
-  // A gate id is a building id (or field1), `plot:N` (field N owned), or `any:a,b,...`
-  // for ground shared by several.
-  const owned = (id) => (id.startsWith('plot:') ? game.state.plots.owned.includes(Number(id.slice(5))) : game.built(id))
+  // A gate id is a building id (or field1), `plot:N` (field N owned), `pad:<name>` (that decor
+  // pad bought, FARM.pads), or `any:a,b,...` for ground shared by several.
+  const owned = (id) => (id.startsWith('plot:') ? game.state.plots.owned.includes(Number(id.slice(5))) : id.startsWith('pad:') ? game.padBought(id.slice(4)) : game.built(id))
   const isOn = (id) => (id.startsWith('any:') ? id.slice(4).split(',').some(owned) : owned(id))
   const shown = new Set()
 
@@ -96,6 +96,7 @@ export function buildGates(root, { pads, particles }) {
     sync(true)
     refresh()
   })
+  game.on('pad', () => sync(true))
   game.on('plot', ({ why } = {}) => {
     sync(why === 'buy')
     refresh()

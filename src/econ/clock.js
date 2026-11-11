@@ -117,6 +117,7 @@ export function attachLighting(l) {
 function festivalTick(f) {
   const s = st()
   const F = GAME.festival
+  if (!F.enabled) return
   const lastAutumnDay = clock.season === 'autumn' && seasonDay() === S.days
   const on = lastAutumnDay && f >= F.from && f < F.to
   if (on !== clock.festival) {

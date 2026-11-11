@@ -560,14 +560,18 @@ export function buildChickenYard(root, { addLamp }) {
     cyl(g, 0.34, 0.26, 0.34, M('#b07a3e', { roughness: 0.9 }), x, 0.17, z, 12)
     for (let i = 0; i < 6; i++) cyl(g, 0.08, 0.08, 0.15, materials().egg, x + Math.cos(i) * 0.15, 0.38, z + Math.sin(i) * 0.15, 8)
   }
-  // Lanterns around the yard (warm glow, lit at night).
-  const lamp = (x, y, z) => addLamp(x, y, z)
-  lanternPost(g, -64.6, 16.6, 2.4)
-  lanternPost(g, -44, 16.6, 2.4, lamp)
-  lanternPost(g, -24, 16.6, 2.4)
-  lanternPost(g, -64.6, -10.6, 2.4)
-  lanternPost(g, -28, -10.4, 2.4, lamp)
   bakeInto(root, g)
+  // Lanterns around the yard (warm glow, lit at night): the Farm Lanterns decor pad (FARM.pads).
+  gated(root, 'pad:Farm Lanterns', (G) => {
+    const lg = new Group()
+    const lamp = (x, y, z) => addLamp(x, y, z)
+    lanternPost(lg, -64.6, 16.6, 2.4)
+    lanternPost(lg, -44, 16.6, 2.4, lamp)
+    lanternPost(lg, -24, 16.6, 2.4)
+    lanternPost(lg, -64.6, -10.6, 2.4)
+    lanternPost(lg, -28, -10.4, 2.4, lamp)
+    bakeInto(G, lg)
+  }, 2.6)
   solidCyl(0.6, 1.2, -36, 12)
   solidCyl(0.6, 1.2, -16, 9)
 

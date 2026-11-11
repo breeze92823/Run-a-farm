@@ -2,7 +2,7 @@ import { AUDIO, FARM } from '../config.js'
 import { A, onStart, ready, voice } from './core.js'
 import { burst, crinkle, env, modal, pick, rnd, route, tone } from './synth.js'
 import { rectDist, wind } from '../farm/kit.js'
-import { built } from '../game.js'
+import { built, state } from '../game.js'
 
 // The farm's soundscape, all synthesised and placed in space:
 //  - beds: wind (with gusts that match the swaying wheat), leaf rustle, wheat
@@ -583,9 +583,10 @@ export function createFarmAudio(farm) {
       const tp = place(farm.truckBay.truck.x, farm.truckBay.truck.z, AUDIO.truck.far, 3)
       const inBay = rectDist(L.x, L.z, farm.truckBay.inside) === 0
       loops.truck.set(built('truckBay') ? AUDIO.truck.gain * tp.level : 0, tp.pan, inBay ? 0.9 : tp.verb)
-      // Crowd bed at the stand.
+      // Crowd bed at the stand (customers only come while it has eggs).
+      const stocked = state.stand.eggs > 0
       const sp = place(farm.stand.customers[0], farm.stand.customers[1], AUDIO.crowd.far, 3)
-      loops.crowd.set(AUDIO.crowd.gain * 0.5 * sp.level * day, sp.pan, sp.verb)
+      loops.crowd.set(stocked ? AUDIO.crowd.gain * 0.5 * sp.level * day : 0, sp.pan, sp.verb)
       // Pond.
       const pp = place(farm.north.pond.x, farm.north.pond.z, 45, 14)
       loops.lap.set(0.05 * pp.level, pp.pan, pp.verb)
@@ -623,7 +624,7 @@ export function createFarmAudio(farm) {
 
       // The stand: babble, the till, egg-crate knocks.
       timers.babble -= dt
-      if (timers.babble <= 0 && day > 0.3) {
+      if (timers.babble <= 0 && day > 0.3 && stocked) {
         timers.babble = rnd(0.12, 0.45)
         const [x, z] = farm.stand.customers
         syllable(x + rnd(-2, 2), z + rnd(-1, 3), pick(crowdVoices))
@@ -631,7 +632,7 @@ export function createFarmAudio(farm) {
       timers.register -= dt
       if (timers.register <= 0) {
         timers.register = rnd(...AUDIO.register.every)
-        register(FARM.stand.x + 2.3, FARM.stand.z + 0.8)
+        if (stocked) register(FARM.stand.x + 2.3, FARM.stand.z + 0.8)
       }
       timers.knock -= dt
       if (timers.knock <= 0) {

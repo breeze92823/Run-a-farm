@@ -242,6 +242,9 @@ export function gated(root, id, fn, height = 6) {
   gateRegistry.get(id).push({ group, colliders, height })
   return group
 }
+// The gate group being built right now (inside a `gated` fn), else null: index.js ties a lamp's
+// real light to it, so a lamp that is not bought yet stays dark.
+export const currentGate = () => openGate
 // Shown (and risen) along with the first of `ids` to be bought: shared ground such as a ranch's
 // paths and perimeter fence or a park's lanes.
 export const gatedAny = (root, ids, fn, height = 6) => gated(root, `any:${ids.join(',')}`, fn, height)

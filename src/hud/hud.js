@@ -1,11 +1,12 @@
 import './hud.css'
 import { BoxGeometry, Mesh, MeshBasicMaterial, Raycaster, Vector2, Vector3 } from 'three'
 import { FARM, GAME } from '../config.js'
-import { ICONS, SEED_ICONS } from './icons.js'
+import { GOOD_ICONS, ICONS, SEED_ICONS } from './icons.js'
 import * as game from '../game.js'
 import * as sfx from '../audio/ui.js'
 import { anyWindowOpen, setWindowReserved } from './window.js'
 import { openDealer, openDrones, openIndex, openOffice, openOil, openQuests, openRanch, openSeedMarket, openSettings, openShop } from './menus.js'
+import { openInvite } from './invite.js'
 import { mount } from '../mount.js'
 import * as fx from '../audio/sfx.js'
 import { createHudExtras } from './hud2.js'
@@ -67,20 +68,51 @@ export function createHud({ farm, actions }) {
   money.append(el('span', 'money-coin', ICONS.coin), el('span', 'money-bar'))
   money.lastChild.append(moneyText)
   const boosts = el('div', 'hud-boosts')
-  GAME.boosts.forEach((b) => {
-    const e = button('hud-boost', `<span class="ico">${b.id === 'money' ? ICONS.boostMoney : ICONS.boostFriends}</span>`, () => game.emit('toast', { text: `${b.title}: ${b.text}`, kind: 'info' }))
+  // Earned through invites (game.js boostActive): greyed with a lock until then; a tap opens Invite Friends.
+  const boostEls = GAME.boosts.map((b) => {
+    const e = button('hud-boost', `<span class="ico">${b.id === 'money' ? ICONS.boostMoney : ICONS.boostFriends}</span>`, () => openInvite())
     e.append(outlined('lbl', b.label))
     boosts.append(e)
+    return e
   })
+  const paintBoosts = () =>
+    GAME.boosts.forEach((b, i) => {
+      const on = game.boostActive(b)
+      boostEls[i].classList.toggle('locked', !on)
+      boostEls[i].title = on ? `${b.title}: ${b.text}` : `${b.title} (locked): ${b.unlock}`
+    })
+  paintBoosts()
+  game.on('invite', paintBoosts)
   const moonBadge = el('div', 'hud-moon', `<span class="ico">${ICONS.sun}</span>`)
   const moonText = outlined('lbl', '')
   moonBadge.append(moonText)
   boosts.append(moonBadge)
   row.append(home, money, boosts)
+  // The goal banner appears at the top centre when a goal is new (or just became affordable) and folds
+  // into a GOAL tab on the right edge after a few seconds, or at once with its minimize button. Tap the
+  // tab to bring the banner back for a moment.
   const goal = el('div', 'hud-goal')
   const goalText = el('span', 'goal-text')
   const goalStep = el('span', 'goal-step')
-  goal.append(el('span', 'goal-ico', ICONS.harvester), goalText, goalStep)
+  const goalIco = el('span', 'goal-ico', '')
+  goalIco.style.display = 'none'
+  let goalTimer = 0
+  let goalHas = false
+  const showGoal = (on, ms = 0) => {
+    goal.classList.toggle('shown', on && goalHas)
+    goalTab.classList.toggle('hide', on || !goalHas)
+    clearTimeout(goalTimer)
+    if (on && ms) goalTimer = setTimeout(() => showGoal(false), ms)
+  }
+  const goalMin = button('goal-min', '−', () => showGoal(false))
+  goalMin.setAttribute('aria-label', 'Minimize goal')
+  const goalTab = button('goal-tab hide', '<span>GOAL</span>', () => showGoal(true, 9000))
+  goalTab.setAttribute('aria-label', 'Show the next goal')
+  goal.append(goalIco, goalText, goalStep, goalMin)
+  // A picture shows only when the goal is a vehicle (its bay is built); otherwise no icon.
+  const GOAL_ICON = { tractors: 'tractor', trucks: 'truck' }
+  let goalIcoKey = null
+  let goalSeen = null // which goal / ready state the card last announced
   top.append(row, goal)
 
   // --- Left: menu buttons + event card ---------------------------------------------------------
@@ -122,18 +154,28 @@ export function createHud({ farm, actions }) {
   const sCargo = statRow('cargo', 'cargo', 'CARGO', 'red')
 
   // --- Hotbar ------------------------------------------------------------------------------------------
+  // What the player carries (game.hotbarItems): bought seed packs, then the goods in the bag.
+  // Keys 1-9 / a tap pick one; the held item shows in the avatar's hands.
   const hotbar = el('div', 'hud-hotbar')
-  hotbar.append(outlined('hotbar-title', 'SEEDS TO PLANT'))
+  hotbar.append(outlined('hotbar-title', 'HOTBAR'))
   const slotsRow = el('div', 'hotbar-slots')
-  const slots = GAME.seeds.map((s, i) => {
-    const b = button('slot', `<span class="slot-ico">${SEED_ICONS[s.id]}</span><span class="slot-lock">${ICONS.lock}</span>`, () => game.selectSeed(i))
-    b.append(outlined('slot-num', String(i + 1)))
-    const count = outlined('slot-count', '')
-    b.append(count)
-    slotsRow.append(b)
-    return { b, count }
-  })
   hotbar.append(slotsRow)
+  let slots = []
+  let slotsKey = ''
+  function buildSlots(items) {
+    slotsRow.textContent = ''
+    slots = items.map((it, k) => {
+      const ico = it.kind === 'seed' ? SEED_ICONS[it.id] : GOOD_ICONS[it.id] ?? ICONS.crate
+      const b = button(`slot ${it.kind}`, `<span class="slot-ico">${ico}</span>`, () => game.selectHotbar(k))
+      b.title = it.kind === 'seed' ? `${GAME.seeds[it.i].name} seeds` : GAME.goods[it.id].name
+      if (k < 9) b.append(outlined('slot-num', String(k + 1)))
+      if (it.kind === 'seed') b.append(el('span', 'slot-tag', 'SEEDS'))
+      const count = outlined('slot-count', '')
+      b.append(count)
+      slotsRow.append(b)
+      return { b, count, it }
+    })
+  }
 
   // --- Right: quests ------------------------------------------------------------------------------------
   const questBtn = button('hud-quests', `<span class="ico">${ICONS.back}</span>`, () => openQuests())
@@ -156,7 +198,7 @@ export function createHud({ farm, actions }) {
   const toasts = el('div', 'hud-toasts')
   const pops = el('div', 'hud-pops')
 
-  root.append(top, left, event, stats, hotbar, questBtn, prompt, toasts, pops)
+  root.append(top, goalTab, left, event, stats, hotbar, questBtn, prompt, toasts, pops)
   const extras = createHudExtras({ root, top, left, stats, button, popAt: (...a) => popAt(...a), toast: (t) => toast(t), farm, actions })
 
   // --- Toasts ---------------------------------------------------------------------------------------------
@@ -294,6 +336,24 @@ export function createHud({ farm, actions }) {
     sfx.coin(n)
     popAt(FARM.stand.x + (Math.random() - 0.5) * 2, 4, FARM.stand.z + 1, `+${game.fmtMoney(amount)}`)
   })
+  // Plants picked one by one: a soft pickup sound and a "+N" by the player, batched every ~0.4 s.
+  const picks = { n: 0, good: null, t: 0, timer: 0 }
+  const flushPicks = () => {
+    picks.timer = 0
+    if (picks.n > 0) popAt(lastPos.x, 2.6, lastPos.z, `+${picks.n} ${GAME.goods[picks.good].name}`, false)
+    picks.n = 0
+  }
+  game.on('pick', ({ n, good }) => {
+    if (picks.good !== good) flushPicks()
+    picks.good = good
+    picks.n += n
+    const now = performance.now()
+    if (now - picks.t > 140) {
+      picks.t = now
+      sfx.collect(1)
+    }
+    if (!picks.timer) picks.timer = setTimeout(flushPicks, 400)
+  })
   game.on('harvest', ({ p, n, good, player }) => {
     sfx.collect(5)
     const c = p.crops
@@ -307,20 +367,20 @@ export function createHud({ farm, actions }) {
     } else if (w.id === 'stocker') popAt(FARM.stand.x, 4.6, FARM.stand.z, `+${n} eggs`, false)
   })
 
-  // --- Upgrade pads: bought ones disappear --------------------------------------------------------------------
+  // --- Decor pads: shown once the buildings they need stand, gone once bought ------------------------------------
   function applyPads() {
     for (const p of farm.pads.pads) {
-      if (p.dynamic) continue // plot pads: plots.js shows and hides them
-      const bought = game.padBought(p.name)
-      p.disc.visible = !bought
-      p.rim.visible = !bought
-      p.label.visible = !bought
-      for (const r of p.rings) r.visible = !bought
+      if (p.dynamic) continue // plot / building pads: plots.js and gates.js show and hide them
+      p.setVisible(game.padReady(p))
     }
   }
   applyPads()
   game.on('pad', applyPads)
-  game.on('plot', () => (target = null))
+  game.on('build', applyPads)
+  game.on('plot', () => {
+    target = null
+    applyPads() // Field 1 counts as a building (`field1`)
+  })
 
   // --- Interaction: the nearest thing the player can use --------------------------------------------------------
   let target = null
@@ -328,8 +388,19 @@ export function createHud({ farm, actions }) {
   function findTarget(pos) {
     let best = null
     let bestD = Infinity
-    // Riding: the prompt is always "get off".
-    if (farm.rideables.current) return farm.rideables.target(pos)
+    // Riding: "get off", unless a drive-up service (refuel at the Fuel Station, repair at
+    // the Workshop) is in reach and has work to do (hud2.js flags those `drive`).
+    if (farm.rideables.current) {
+      for (const t of extras.targets(pos)) {
+        if (!t.drive) continue
+        const d = Math.hypot(pos.x - t.x, pos.z - t.z)
+        if (d < t.reach && d < bestD) {
+          best = t
+          bestD = d
+        }
+      }
+      return best ?? farm.rideables.target(pos)
+    }
     const consider = (x, z, reach, t) => {
       const d = Math.hypot(pos.x - x, pos.z - z)
       if (d < reach && d < bestD) {
@@ -339,7 +410,10 @@ export function createHud({ farm, actions }) {
     }
     const s = FARM.seedStall
     if (game.built('seedMarket')) consider(s.x, s.z + 2.6, 5, { text: 'OPEN SEED MARKET', sub: 'Seed Market', run: () => openSeedMarket() })
-    consider(FARM.dealer.x, FARM.dealer.z - 2, FARM.dealer.reach, { text: 'VEHICLE DEALER', sub: 'Tractors, trucks, bike upgrades', run: () => openDealer() })
+    // The dealer: its front desk inside the showroom, and every vehicle on the lot out front.
+    const desk = farm.town.desk
+    consider(desk.x, desk.z, desk.reach, { text: 'VIEW VEHICLES', sub: 'Vehicle Dealer · front desk', run: () => openDealer() })
+    for (const v of farm.town.lotSpots) consider(v.x, v.z, 4.5, { text: 'VIEW VEHICLES', sub: `${v.name[0]}${v.name.slice(1).toLowerCase()} for sale · Vehicle Dealer`, run: () => openDealer() })
     if (game.built('droneBase')) consider(farm.drones.console[0], farm.drones.console[1], 4, { text: 'DRONE BASE', sub: `${game.state.drones.n}/${GAME.drones.max} drones`, run: () => openDrones() })
     if (game.built('oilField')) consider(farm.oil.tankAt[0], farm.oil.tankAt[1] + 5, 4.5, { text: 'OIL FIELD', sub: `Tank ${Math.floor(game.state.oil.tank)}/${game.oilTankMax()} barrels`, run: () => openOil() })
     for (const sp of farm.ranch.spots) if (game.built(sp.r.id) && !sp.r.hold) consider(sp.x, sp.z, 3.2, { text: sp.r.name.toUpperCase(), sub: 'Animals and upgrades', run: () => openRanch(sp.r) })
@@ -460,22 +534,46 @@ export function createHud({ farm, actions }) {
     // The goal: the cheapest building / field / vehicle for sale right now.
     const next = game.nextGoal()
     const need = next ? next.price - st.money : 0
-    goal.style.display = next ? '' : 'none'
+    if (!!next !== goalHas) {
+      goalHas = !!next
+      if (!next) showGoal(false)
+    }
     if (next) goalText.textContent = need > 0 ? `Next: ${next.name} · need ${game.fmtMoney(need)} more!` : `${next.name} ready to buy!`
     goal.classList.toggle('ready', need <= 0)
+    goalTab.classList.toggle('ready', need <= 0)
+    const gk = next ? GOAL_ICON[next.id] ?? '' : ''
+    if (gk !== goalIcoKey) {
+      goalIcoKey = gk
+      goalIco.innerHTML = gk ? ICONS[gk] : ''
+      goalIco.style.display = gk ? '' : 'none'
+    }
+    const seen = next ? `${next.id}:${need <= 0}` : null
+    if (seen !== goalSeen) {
+      goalSeen = seen
+      if (seen) showGoal(true, 8000) // a new goal, or it just became affordable
+    }
     goalStep.textContent = `${st.built.length + st.plots.owned.length}/${GAME.buildings.length + GAME.plots.max}`
-    slots.forEach(({ b, count }, i) => {
-      const s = st.seeds[i]
-      b.classList.toggle('locked', !s.unlocked)
-      b.classList.toggle('selected', st.selected === i)
-      count.textContent = s.unlocked ? `x${s.count}` : ''
-      b.style.display = SEED_ICONS[GAME.seeds[i].id] ? '' : 'none'
-      count.style.display = s.unlocked ? '' : 'none'
-    })
+    paintHotbar()
     const ready = game.questsReady()
     questBadge.style.display = ready > 0 ? '' : 'none'
   }
+  function paintHotbar() {
+    const items = game.hotbarItems()
+    const key = items.map((it) => `${it.kind}:${it.id}`).join('|')
+    if (key !== slotsKey) {
+      slotsKey = key
+      buildSlots(items)
+    }
+    hotbar.style.display = items.length ? '' : 'none'
+    const h = game.hand
+    slots.forEach(({ b, count }, k) => {
+      const it = items[k]
+      b.classList.toggle('selected', h.kind === it.kind && h.id === it.id)
+      count.textContent = `x${it.count}`
+    })
+  }
   game.on('change', paint)
+  game.on('hold', paintHotbar)
   paint()
 
   // --- Layout --------------------------------------------------------------------------------------------------------

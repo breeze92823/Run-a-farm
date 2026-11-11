@@ -166,7 +166,6 @@ export function buildPlots(root, { pads, particles }) {
     rt.needsUpdate = true
     const ridgeMat = new MeshStandardMaterial({ map: rt, color: SOIL.clone(), roughness: 1 })
     const ridges = new InstancedMesh(ridgeGeo, ridgeMat, rows)
-    const spots = []
     for (let i = 0; i < rows; i++) {
       const x = x0 + i * FARM.fieldRow
       o.position.set(x, 0.02, (c.minZ + c.maxZ) / 2)
@@ -174,22 +173,30 @@ export function buildPlots(root, { pads, particles }) {
       o.scale.set(1, 1, 1)
       o.updateMatrix()
       ridges.setMatrixAt(i, o.matrix)
-      for (let z = c.minZ + 0.6; z < c.maxZ - 0.4; z += 1) spots.push([x + (rand() - 0.5) * 0.3, z + (rand() - 0.5) * 0.25])
     }
+    // One clump per plant spot: the same spots game.js picks one by one.
+    const spots = game.plotSpots(p)
     ridges.receiveShadow = true
     g.add(ridges)
     const cropMat = new MeshStandardMaterial({ vertexColors: true, roughness: 0.8, color: GREEN.clone(), emissive: '#000000' })
     addSway(cropMat, { bend: 0.16, sheen: 0.3 })
     const crop = new InstancedMesh(clumpGeo, cropMat, spots.length)
+    const full = [] // each plant's standing matrix
+    const stub = [] // ...and its cut stubble once picked
     spots.forEach(([x, z], i) => {
       o.position.set(x, 0, z)
       o.rotation.set(0, (rand() - 0.5) * 0.6, 0)
       const s = 0.85 + rand() * 0.3
       o.scale.set(s, 0.85 + rand() * 0.3, s)
       o.updateMatrix()
-      crop.setMatrixAt(i, o.matrix)
+      full.push(o.matrix.clone())
+      o.scale.set(s * 0.7, 0.07, s * 0.7)
+      o.updateMatrix()
+      stub.push(o.matrix.clone())
+      crop.setMatrixAt(i, full[i])
     })
     crop.receiveShadow = true
+    crop.frustumCulled = false // the instances span the whole plot, far from the clump geometry's own bounds
     const cropRoot = new Group() // stretched up (y) as the crop grows
     cropRoot.position.y = 0.2
     cropRoot.add(crop)
@@ -236,8 +243,17 @@ export function buildPlots(root, { pads, particles }) {
     g.add(card)
     root.add(g)
     addSurface(r, 'soil')
-    return { g, crop, cropRoot, cropMat, ridgeMat, sprinklers, sacks, card }
+    const f = { g, crop, cropRoot, cropMat, ridgeMat, sprinklers, sacks, card, full, stub }
+    syncPlants(p, f)
+    return f
   }
+  // Every plant standing, except the picked ones (cut to stubble).
+  function syncPlants(p, f) {
+    const picked = game.plotPicked(p).set
+    for (let i = 0; i < f.full.length; i++) f.crop.setMatrixAt(i, picked.has(i) ? f.stub[i] : f.full[i])
+    f.crop.instanceMatrix.needsUpdate = true
+  }
+  const syncAll = () => plots.forEach((pl) => pl.farmed && syncPlants(pl.p, pl.farmed))
 
   // Dust kicked up across a plot (tilling, harvesting).
   function burst(p, color, n) {
@@ -286,7 +302,24 @@ export function buildPlots(root, { pads, particles }) {
   game.on('build', () => refresh()) // Coop 2 puts Field 1 up for sale
   game.on('reset', () => refresh())
   game.on('pad', () => refresh())
-  game.on('harvest', ({ p }) => burst(p, '#e8c25a', 18))
+  game.on('harvest', ({ p }) => {
+    burst(p, '#e8c25a', 18)
+    syncAll() // the field replants: every plant stands again
+  })
+  game.on('reset', syncAll)
+  // A plant picked by the player: cut it to stubble with a puff of chaff.
+  game.on('pick', ({ p, cut, good }) => {
+    const pl = plots.find((x) => x.p === p)
+    const f = pl?.farmed
+    if (!f) return
+    const spots = game.plotSpots(p)
+    const color = GAME.goods[good]?.color ?? '#e8c25a'
+    for (const i of cut) {
+      f.crop.setMatrixAt(i, f.stub[i])
+      particles?.dust(spots[i][0], spots[i][1], color, 2)
+    }
+    f.crop.instanceMatrix.needsUpdate = true
+  })
 
   // Pads go red / green as the money crosses their price (checked twice a second).
   let moneyT = 0
@@ -330,7 +363,11 @@ export function buildPlots(root, { pads, particles }) {
         const hand = game.plotHasHand(p)
         const name = crop ? game.seedDef(crop).name.toUpperCase() : ''
         if (!crop) f.card.userData.set(`FIELD ${p.n}`, 'NO SEEDS: BUY AT THE SEED MARKET', 0, '#ff8a6a')
-        else if (ripe) f.card.userData.set(`FIELD ${p.n} · ${name}`, hand ? 'READY! FIELD HAND COMING' : game.plotClaimed(p) ? 'TRACTOR HARVESTING' : 'READY! WALK OR DRIVE IN', 1, '#5cff6a')
+        else if (ripe) {
+          const done = game.plotPicked(p).arr.length / f.full.length
+          const what = hand ? 'READY! FIELD HAND COMING' : game.plotClaimed(p) ? 'TRACTOR HARVESTING' : done > 0 ? `HARVESTED ${Math.floor(done * 100)}%: PICK THE REST` : 'READY! WALK THE ROWS TO PICK'
+          f.card.userData.set(`FIELD ${p.n} · ${name}`, what, done > 0 ? 1 - done : 1, '#5cff6a')
+        }
         else f.card.userData.set(`FIELD ${p.n} · ${name}`, `GROWING ${Math.floor(g * 100)}%  +${game.plotYield(p)} ${name}`, g, '#ffcc33')
         f.card.position.y = 4.4 + Math.sin(t * 1.3 + pl.k) * 0.06
       }

@@ -18,7 +18,7 @@ import { idle, makeNPC } from './npc.js'
 const V = GAME.cartons.van
 const ROAD_IN = FARM.road.z - 3 // the westbound lane
 const STOP_X = FARM.cartonPallet.x - 1
-const FROM_X = FARM.town.maxX + 20
+const FROM_X = FARM.mainStreet.x // it turns in from Main Street, in town
 const GONE_X = -460
 
 function labelSprite() {

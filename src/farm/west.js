@@ -3,7 +3,6 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { FARM, westPlots } from '../config.js'
 import { mulberry32 } from '../textures.js'
 import { E, M, addSurface, bakeInto, block, box, cyl, gableRoof, gatedAny, prism, signCanvas, signMaterial, signPanel } from './kit.js'
-import { fence } from './fence.js'
 import { addSway, part } from './field.js'
 import { awning, pumpkin } from './props.js'
 import { paintDirt, tex } from './textures.js'
@@ -182,12 +181,8 @@ export function buildWest(root) {
     tuftMesh.setMatrixAt(i, o.matrix)
   })
   root.add(tuftMesh)
-  // The plot's north fence along the plots (gaps where the tracks meet the dirt road)
-  // and a fence down the far west edge.
-  for (const p of plots.slice(W.cols)) fence([[p.rect.minX, FARM.northEdge], [p.rect.maxX, FARM.northEdge]], 'wood')
-  fence([[W.minX - 2, FARM.northEdge], [W.minX - 2, FARM.path.minZ - 2]], 'wood')
-  neighbour(root, FARM.neighbor)
-  neighbour(root, FARM.neighbor2)
+  // Their north and west sides are the farm's boundary fence (farm/scenery.js plotFences).
+  // The other farms are the other players' now, around the town (farm/remote.js).
 
   return { rect: { minX: W.minX, maxX: W.maxX, minZ: W.minZ, maxZ: W.maxZ } }
 }

@@ -1,4 +1,4 @@
-import { BufferGeometry, CanvasTexture, ConeGeometry, DoubleSide, Float32BufferAttribute, Group, Mesh, SphereGeometry, Sprite, SpriteMaterial, SRGBColorSpace } from 'three'
+import { BufferGeometry, CanvasTexture, Color, ConeGeometry, DoubleSide, Float32BufferAttribute, Group, InstancedMesh, LatheGeometry, Mesh, MeshStandardMaterial, Object3D, SphereGeometry, Sprite, SpriteMaterial, SRGBColorSpace, Vector2 } from 'three'
 import { FARM, GAME } from '../config.js'
 import * as game from '../game.js'
 import { mulberry32 } from '../textures.js'
@@ -23,17 +23,48 @@ const flagGeo = new BufferGeometry()
 flagGeo.setAttribute('position', new Float32BufferAttribute([-0.14, 0, 0, 0.14, 0, 0, 0, -0.32, 0], 3))
 flagGeo.computeVertexNormals()
 
+// --- Stand eggs ----------------------------------------------------------------------------------
+// The trays, cartons, baskets and the egg tower are baked empty; each egg spot
+// is an `eggSlot` marker that `stage()` collects into one InstancedMesh per
+// stand piece, so the stand fills up (and empties) with its real stock.
+function eggSlot(parent, x, y, z, brown, r) {
+  const o = new Object3D()
+  o.position.set(x, y, z)
+  o.rotation.set((Math.random() - 0.5) * 0.25, Math.random() * Math.PI, (Math.random() - 0.5) * 0.25)
+  o.scale.set(r, r * 1.28, r)
+  o.userData.eggSlot = brown ? 1 : 0
+  parent.add(o)
+}
+let eggGeo = null
+// A unit egg (radius 1, a little narrower at the top).
+function eggGeometry() {
+  if (eggGeo) return eggGeo
+  const pts = []
+  for (let i = 0; i <= 8; i++) {
+    const a = (i / 8) * Math.PI
+    const y = -Math.cos(a)
+    pts.push(new Vector2(Math.max(0.001, Math.sin(a) * (1 - 0.16 * y)), y))
+  }
+  eggGeo = new LatheGeometry(pts, 10)
+  return eggGeo
+}
+const eggMat = new MeshStandardMaterial({ color: '#ffffff', roughness: 0.38 })
+const EGG_WHITE = new Color('#fff7e8')
+const EGG_BROWN = new Color('#e3b98a')
+
 function eggTray(g, x, y, z, cols = 4, rows = 3, ry = 0) {
   const t = new Group()
   t.position.set(x, y, z)
   t.rotation.y = ry
   block(t, cols * 0.2 + 0.08, 0.06, rows * 0.2 + 0.08, M('#d9c49b', { roughness: 1 }), 0, 0, 0)
-  const egg = M('#fff7e8', { roughness: 0.35 })
-  const brown = M('#e8c69a', { roughness: 0.4 })
+  // The moulded cups the eggs sit in.
+  const cup = M('#cdb68a', { roughness: 1 })
   for (let i = 0; i < cols; i++) {
     for (let j = 0; j < rows; j++) {
-      const e = cyl(t, 0.075, 0.075, 0.14, (i + j) % 4 === 0 ? brown : egg, (i - (cols - 1) / 2) * 0.2, 0.12, (j - (rows - 1) / 2) * 0.2, 8)
-      e.scale.set(1, 1.15, 1)
+      const cx = (i - (cols - 1) / 2) * 0.2
+      const cz = (j - (rows - 1) / 2) * 0.2
+      cyl(t, 0.085, 0.06, 0.05, cup, cx, 0.085, cz, 8, false)
+      eggSlot(t, cx, 0.17, cz, (i + j) % 4 === 0, 0.072)
     }
   }
   g.add(t)
@@ -46,17 +77,16 @@ function carton(g, x, y, z, ry = 0) {
   block(t, 0.62, 0.12, 0.28, M('#9fb7c9', { roughness: 1 }), 0, 0, 0)
   const lid = block(t, 0.62, 0.04, 0.28, M('#9fb7c9', { roughness: 1 }), 0, 0.12, -0.24)
   lid.rotation.x = -1.1
-  for (let i = 0; i < 6; i++) {
-    const e = cyl(t, 0.06, 0.06, 0.11, M('#fff7e8', { roughness: 0.35 }), (i % 3 - 1) * 0.19, 0.17, (Math.floor(i / 3) - 0.5) * 0.12, 8)
-    e.scale.set(1, 1.15, 1)
-  }
+  for (let i = 0; i < 6; i++) eggSlot(t, (i % 3 - 1) * 0.19, 0.17, (Math.floor(i / 3) - 0.5) * 0.12, false, 0.058)
   g.add(t)
 }
 
 function basket(g, x, y, z, eggs = true) {
   cyl(g, 0.3, 0.22, 0.28, M('#b9813f', { roughness: 0.95 }), x, y + 0.14, z, 12)
   cyl(g, 0.31, 0.31, 0.04, M('#8d5a2b'), x, y + 0.28, z, 12)
-  if (eggs) for (let i = 0; i < 7; i++) cyl(g, 0.07, 0.07, 0.13, M(i % 3 ? '#fff7e8' : '#e8c69a', { roughness: 0.35 }), x + Math.cos(i * 0.9) * (i ? 0.15 : 0), y + 0.32, z + Math.sin(i * 0.9) * (i ? 0.15 : 0), 8)
+  // A straw lining, seen when the basket is empty.
+  cyl(g, 0.27, 0.27, 0.02, M('#d8b55e', { roughness: 1 }), x, y + 0.24, z, 12, false)
+  if (eggs) for (let i = 0; i < 7; i++) eggSlot(g, x + Math.cos(i * 0.9) * (i ? 0.15 : 0), y + 0.33, z + Math.sin(i * 0.9) * (i ? 0.15 : 0), i % 3 === 0, 0.068)
   const handle = cyl(g, 0.24, 0.24, 0.03, M('#8d5a2b'), x, y + 0.3, z, 12)
   handle.rotation.x = Math.PI / 2
   handle.scale.set(1, 1, 0.12)
@@ -78,13 +108,34 @@ function stage(root, build, height) {
   root.add(group)
   const sx = FARM.stand.x
   const sz = FARM.stand.z
+  const slots = []
   const colliders = captureColliders(() => {
     const g = new Group()
     build(g, (hx, hy, hz, x, y, z) => solid(hx, hy, hz, sx + x, y, sz + z), (r, h, x, z) => solidCyl(r, h, sx + x, sz + z))
     g.position.set(sx, 0.04, sz)
+    // Pull the egg spots out before baking (their matrices are in the stage group's frame).
+    g.updateMatrixWorld(true)
+    const marks = []
+    g.traverse((o) => o.userData.eggSlot !== undefined && marks.push(o))
+    for (const o of marks) {
+      slots.push({ m: o.matrixWorld.clone(), brown: o.userData.eggSlot })
+      o.removeFromParent()
+    }
     bakeInto(group, g)
   })
-  return { group, colliders, height }
+  let eggs = null
+  if (slots.length) {
+    eggs = new InstancedMesh(eggGeometry(), eggMat, slots.length)
+    slots.forEach((s, i) => {
+      eggs.setMatrixAt(i, s.m)
+      eggs.setColorAt(i, s.brown ? EGG_BROWN : EGG_WHITE)
+    })
+    eggs.count = 0
+    eggs.receiveShadow = true
+    eggs.frustumCulled = false // small, and the instances sit far from the geometry's own bounds
+    group.add(eggs)
+  }
+  return { group, colliders, height, eggs, slots: slots.length }
 }
 
 function stallStages(root) {
@@ -323,16 +374,13 @@ function stallStages(root) {
       const tw = new Group()
       tw.position.set(-2.3, 0, 2.6)
       cyl(tw, 0.06, 0.06, 1.7, woodDark, 0, 0.85, 0, 8)
-      const egg = M('#fff7e8', { roughness: 0.35 })
-      const brown = M('#e8c69a', { roughness: 0.4 })
       ;[0.75, 0.55, 0.35].forEach((r, k) => {
         const y = 0.45 + k * 0.5
         cyl(tw, r, r, 0.05, top, 0, y, 0, 20)
         const n = Math.round(r * 18)
         for (let i = 0; i < n; i++) {
           const a = (i / n) * Math.PI * 2
-          const e = cyl(tw, 0.07, 0.07, 0.13, i % 3 ? egg : brown, Math.cos(a) * (r - 0.1), y + 0.1, Math.sin(a) * (r - 0.1), 8, false)
-          e.scale.set(1, 1.15, 1)
+          eggSlot(tw, Math.cos(a) * (r - 0.1), y + 0.11, Math.sin(a) * (r - 0.1), i % 3 === 0, 0.066)
         }
       })
       const crown = cyl(tw, 0.1, 0.1, 0.16, M('#ffd23f', { metalness: 0.7, roughness: 0.25 }), 0, 1.78, 0, 10)
@@ -628,28 +676,16 @@ export function buildFarmStand(root, { addLamp }) {
   // A low fence along the plaza's west edge (the yard fence closes the north).
   fence([[P.minX, P.minZ], [P.minX, P.maxZ - 4]], 'wood')
 
-  // People: the seller behind the counter (from the wooden counter on), a
-  // queue, and a shopper walking in from the road.
+  // People: the seller behind the counter (from the wooden counter on) and a
+  // passer-by on the sidewalk. The customers are the stand visitors in
+  // living.js, who only come while the stand has eggs.
   const sx = FARM.stand.x
   const sz = FARM.stand.z
   const seller = makeNPC({ shirt: '#f2efe6', pants: '#3a3f55', apron: '#c8302a', hat: 'cap', hatColor: '#c8302a', hair: '#6b3b1d' })
   seller.group.position.set(sx - 0.6, 0.04, sz - 0.2)
-  const queue = [
-    makeNPC({ shirt: '#4cae5a', pants: '#2c3e66', hair: '#2a1a10', skin: '#e0ac7e' }),
-    makeNPC({ shirt: '#e58ab8', pants: '#3a3a44', hat: 'beanie', hatColor: '#f2c230', skin: '#f7d6b5' }),
-    makeNPC({ shirt: '#3a86d8', pants: '#e4d2b0', hair: '#c9862b', item: 'tray' }),
-  ]
-  queue.forEach((n, i) => {
-    n.group.position.set(sx + 0.4 - i * 0.2, 0.04, sz + 2.5 + i * 1.5)
-    n.group.rotation.y = Math.PI + (i - 1) * 0.15
-  })
-  const shopper = makeNPC({ shirt: '#8a5ad8', pants: '#2c2c3a', hat: 'straw', item: 'basket', skin: '#b97a50' })
   const passer = makeNPC({ shirt: '#e2763a', pants: '#3c4a6a', hat: 'cap', hatColor: '#3a6ad8' })
-  root.add(seller.group, shopper.group, passer.group, ...queue.map((n) => n.group))
-  const walkers = [
-    makeWalker(shopper, [[sx + 3.5, sz + 3.5], [sx + 7, sz + 8.5], [sx - 9, sz + 8.5], [sx - 6, sz + 4]], { speed: 1.4, pause: 3, y: 0.04 }),
-    makeWalker(passer, [[-80, 38.6], [30, 38.6], [70, 38.6]], { speed: 1.6, pause: 6, y: FARM.curbHeight, pingPong: true }),
-  ]
+  root.add(seller.group, passer.group)
+  const walkers = [makeWalker(passer, [[-80, 38.6], [30, 38.6], [70, 38.6]], { speed: 1.6, pause: 6, y: FARM.curbHeight, pingPong: true })]
   seller.group.rotation.y = 0
 
   // --- Stand level: which pieces stand, and the rise of a new one ------------------------------
@@ -708,6 +744,26 @@ export function buildFarmStand(root, { addLamp }) {
   game.on('build', (b) => b.id === 'decorBillboard' && billLamp && (billLamp.visible = true))
   apply(game.upgradeLevel('stand'))
 
+  // The eggs on show follow the stand's stock: empty trays at 0, every spot filled when full.
+  // Spots fill piece by piece in build order (the front counter first).
+  let eggKey = ''
+  function fillEggs() {
+    const st = game.state.stand
+    const key = `${st.eggs}|${st.max}|${stages.map((s) => (s.group.visible ? 1 : 0)).join('')}`
+    if (key === eggKey) return
+    eggKey = key
+    const shown = stages.filter((s) => s.eggs && s.group.visible)
+    const total = shown.reduce((a, s) => a + s.slots, 0)
+    let n = st.eggs > 0 ? Math.max(1, Math.round((Math.min(st.eggs, st.max) / Math.max(1, st.max)) * total)) : 0
+    for (const s of stages) {
+      if (!s.eggs) continue
+      const k = s.group.visible ? Math.min(n, s.slots) : 0
+      s.eggs.count = k
+      n -= k
+    }
+  }
+  fillEggs()
+
   let padT = 0
   return {
     customers: [sx, sz + 3],
@@ -719,6 +775,7 @@ export function buildFarmStand(root, { addLamp }) {
       refreshPad()
     },
     update(dt, t) {
+      fillEggs()
       card.update(dt)
       card.sprite.position.y = 5.2 + Math.sin(t * 1.2) * 0.05
       if (seller.group.visible) {
@@ -726,7 +783,6 @@ export function buildFarmStand(root, { addLamp }) {
         // The seller sways side to side between the trays.
         seller.group.position.x = sx - 0.6 + Math.sin(t * 0.3) * 1.4
       }
-      for (const n of queue) idle(n, t, dt, 0.5)
       for (const w of walkers) updateWalker(w, t, dt)
       for (let i = rising.length - 1; i >= 0; i--) {
         const r = rising[i]

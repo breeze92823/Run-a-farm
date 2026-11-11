@@ -169,6 +169,28 @@
   height: calc(56 * var(--px));
   opacity: 0.75;
 }
+/* A boost not earned yet (no invite sent / no invited friend joined): greyed with a padlock. */
+.hud-boost.locked .ico,
+.hud-boost.locked .lbl {
+  filter: grayscale(1) brightness(0.8);
+  opacity: 0.55;
+}
+.hud-boost {
+  position: relative;
+  cursor: pointer;
+}
+.hud-boost.locked::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: calc(24 * var(--px));
+  height: calc(26 * var(--px));
+  min-width: 12px;
+  min-height: 13px;
+  background: center / contain no-repeat
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 26'%3E%3Cpath d='M6 11V8a6 6 0 0 1 12 0v3' fill='none' stroke='%23222' stroke-width='3.4'/%3E%3Cpath d='M6 11V8a6 6 0 0 1 12 0v3' fill='none' stroke='%23ffd23a' stroke-width='2'/%3E%3Crect x='2.5' y='11' width='19' height='13.5' rx='3' fill='%23ffd23a' stroke='%23222' stroke-width='1.6'/%3E%3C/svg%3E");
+}
 .hud-boost .lbl,
 .hud-moon .lbl {
   margin-top: calc(-14 * var(--px));
@@ -194,35 +216,86 @@
 }
 .hud-goal {
   position: relative;
-  display: flex;
+  display: none;
   align-items: center;
   gap: calc(14 * var(--px));
   width: calc(390 * var(--px));
   min-width: max-content;
   height: calc(76 * var(--px));
-  padding: 0 calc(14 * var(--px)) 0 calc(84 * var(--px));
+  padding: 0 calc(10 * var(--px)) 0 calc(20 * var(--px));
   background: #fbf3e3;
   border: calc(4 * var(--px)) solid #7b4a26;
   border-radius: calc(10 * var(--px));
   box-shadow: 0 calc(4 * var(--px)) 0 rgba(90, 50, 22, 0.55);
   color: #3a2414;
 }
+.hud-goal.shown {
+  display: flex;
+  animation: goal-in 0.3s ease-out;
+}
+@keyframes goal-in {
+  from { opacity: 0; transform: translateY(-12px); }
+}
 .hud-goal.ready {
   background: #e6f8d8;
   border-color: #2f7a24;
 }
 .goal-ico {
+  flex: none;
+  width: calc(60 * var(--px));
+  height: calc(60 * var(--px));
+  min-width: 32px;
+  min-height: 32px;
+}
+.goal-ico svg { width: 100%; height: 100%; }
+.goal-min {
+  pointer-events: auto;
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  font: inherit;
+  font-size: calc(28 * var(--px));
+  color: #6b4a2e;
+  background: rgba(123, 74, 38, 0.14);
+  border: 0;
+  border-radius: calc(8 * var(--px));
+  cursor: pointer;
+}
+/* The folded-away goal: a tab on the right edge, mid-height (clear of the quests button above and
+   the toasts, bars and hotbar elsewhere). It pulses while the goal is affordable. */
+.goal-tab {
   position: absolute;
-  left: calc(-4 * var(--px));
+  right: var(--safe-r);
   top: 50%;
-  width: calc(84 * var(--px));
-  height: calc(84 * var(--px));
-  transform: translateY(-55%) rotate(-8deg);
-  filter: drop-shadow(0 calc(3 * var(--px)) 0 rgba(0, 0, 0, 0.2));
+  transform: translateY(-50%);
+  z-index: 3;
+  pointer-events: auto;
+  width: max(calc(44 * var(--px)), 34px);
+  min-height: 84px;
+  padding: calc(10 * var(--px)) 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  font-size: calc(22 * var(--px));
+  letter-spacing: 1px;
+  color: #fff3d6;
+  background: #7b4a26;
+  border: calc(3 * var(--px)) solid #fbf3e3;
+  border-right: 0;
+  border-radius: calc(10 * var(--px)) 0 0 calc(10 * var(--px));
+  box-shadow: 0 calc(3 * var(--px)) 0 rgba(90, 50, 22, 0.55);
+  cursor: pointer;
+}
+.goal-tab.hide { display: none; }
+.goal-tab span { writing-mode: vertical-rl; }
+.goal-tab.ready { background: #2f7a24; animation: goal-pulse 1.6s ease-in-out infinite; }
+@keyframes goal-pulse {
+  50% { transform: translateY(-50%) translateX(-6px); }
 }
 .goal-text {
   flex: 1;
-  font-size: calc(28 * var(--px));
+  font-size: calc(26 * var(--px));
   white-space: nowrap;
 }
 .goal-step {
@@ -431,8 +504,30 @@
 /* Reference: unselected slots 102 x 102, the selected one 115 x 112, ~16 px apart. */
 .hotbar-slots {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
-  gap: calc(14 * var(--px));
+  gap: calc(14 * var(--px)) calc(14 * var(--px));
+  row-gap: calc(30 * var(--px));
+  max-width: min(92vw, calc(9 * 118 * var(--px)));
+}
+/* Seed packs (bought at the Seed Market) get a green tint and a SEEDS tag; the rest are bag goods. */
+.slot.seed {
+  background: linear-gradient(#eef6dc, #cfe2a8);
+  border-color: #6f9a3a;
+}
+.slot-tag {
+  position: absolute;
+  right: calc(4 * var(--px));
+  top: calc(4 * var(--px));
+  padding: 0 calc(5 * var(--px));
+  border-radius: calc(5 * var(--px));
+  background: #3f7a2a;
+  color: #fff;
+  font-size: calc(13 * var(--px));
+  font-weight: 700;
+  line-height: 1.4;
+  pointer-events: none;
 }
 .slot {
   position: relative;
@@ -681,6 +776,35 @@
 /* Narrow (phones in portrait): the hotbar rises above the thumbs, the stats sit above it. */
 .hud.narrow .hud-hotbar {
   bottom: calc(var(--safe-b) + var(--pad) + var(--cluster, 0px) + 18px);
+}
+/* Phones: the hotbar stays one row (the stats sit right above it) and scrolls sideways when full. */
+.hud.narrow .hotbar-slots,
+.hud.short .hotbar-slots {
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  max-width: 88vw;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px 6px calc(30 * var(--px) + 6px);
+  margin-bottom: calc(-30 * var(--px) - 6px);
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+.hud.narrow .hotbar-slots::-webkit-scrollbar,
+.hud.short .hotbar-slots::-webkit-scrollbar {
+  display: none;
+}
+.hud.narrow .hotbar-slots > .slot,
+.hud.short .hotbar-slots > .slot {
+  flex: none;
+}
+.hud.narrow .hotbar-slots > .slot:first-child,
+.hud.short .hotbar-slots > .slot:first-child {
+  margin-left: auto;
+}
+.hud.narrow .hotbar-slots > .slot:last-child,
+.hud.short .hotbar-slots > .slot:last-child {
+  margin-right: auto;
 }
 .hud.narrow .hud-stats {
   bottom: calc(var(--safe-b) + var(--pad) + var(--cluster, 0px) + 18px + 190 * var(--px));

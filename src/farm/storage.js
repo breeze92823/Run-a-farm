@@ -494,7 +494,8 @@ function storageBuild(root, { addLamp }) {
   solidRect(27.8, 29.3, 28.8, 30.2, 1.3)
 
   // Fences: along the road side (with a walk-in gap) and down the east edge.
-  fence([[D.minX + 6, 33.5], [D.maxX + 1, 33.5], [D.maxX + 1, -16]]) // open north of here onto the east lawn
+  // The road side is the farm's boundary fence; this one parts the yard from the east lawn.
+  fence([[D.maxX + 1, FARM.boundary.maxZ], [D.maxX + 1, -16]]) // open north of here onto the east lawn
 
   addLamp(barnInfo.cx, 6.6, FARM.barn.maxZ + 1.5)
   addLamp(40, 5.4, -27)

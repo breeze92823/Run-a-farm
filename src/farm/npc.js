@@ -133,7 +133,7 @@ export function idle(n, t, dt, look = 0.6) {
 }
 
 // Walk cycle at phase w.
-function stride(n, w, amount) {
+export function stride(n, w, amount) {
   const s = Math.sin(w)
   n.legL.rotation.x = s * 0.6 * amount
   n.legR.rotation.x = -s * 0.6 * amount

@@ -105,10 +105,13 @@ export function buildPark(root, { particles, rideables }) {
       addSurface(r, 'gravel')
     }
   }, 0.3)
-  const signC = signCanvas(768, 192, { bg: '#2f6b3a', border: '#f5efd6', borderWidth: 14, radius: 24, plank: 2, lines: [{ text: 'PROCESSING PARK', size: 92, color: '#f5efd6' }] })
-  // By the road, facing it (south).
-  signPanel(root, 8, 2, signMaterial(signC), PARK_TURN.x - 50, 2.6, P.maxZ - 1)
-  for (const x of [46.4, 53.6]) block(root, 0.25, 3.6, 0.25, M('#6e4122'), PARK_TURN.x - x, 0, P.maxZ - 1.05)
+  // The PROCESSING PARK sign by the road, facing it (south): put up with the first park building,
+  // like the lanes, so the park is plain lawn until then.
+  gatedAny(root, parkIds, (G) => {
+    const signC = signCanvas(768, 192, { bg: '#2f6b3a', border: '#f5efd6', borderWidth: 14, radius: 24, plank: 2, lines: [{ text: 'PROCESSING PARK', size: 92, color: '#f5efd6' }] })
+    signPanel(G, 8, 2, signMaterial(signC), PARK_TURN.x - 50, 2.6, P.maxZ - 1)
+    for (const x of [46.4, 53.6]) block(G, 0.25, 3.6, 0.25, M('#6e4122'), PARK_TURN.x - x, 0, P.maxZ - 1.05)
+  }, 3.6)
 
   // --- Processing buildings ------------------------------------------------------------------------------------
   const procs = []
@@ -253,11 +256,10 @@ export function buildPark(root, { particles, rideables }) {
     board.paint(list.slice(0, 3).map((c, i) => ({ title: `${game.fmtMoney(c.reward)} · ${game.fmtClock(con.timeLeft(c))}`, sub: con.wantText(c), color: cols[i % 3] })))
   }
   paintBoard()
-  const MK = FARM.townMarket
   const pb = liveBoard(512, 384)
   const pbMat = new MeshStandardMaterial({ map: pb.t, roughness: 0.8 })
-  const pbx = MK.x + 13
-  const pbz = 66.6
+  const pbx = FARM.priceBoard.x
+  const pbz = FARM.priceBoard.z + 0.6
   const pbPanel = new Mesh(new PlaneGeometry(2.6, 1.95), pbMat)
   pbPanel.position.set(pbx, 2.1, pbz)
   pbPanel.rotation.y = Math.PI

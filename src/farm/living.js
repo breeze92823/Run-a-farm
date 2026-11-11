@@ -157,16 +157,18 @@ export function buildLiving(root, { particles }) {
           }
         } else if (v.state === 'queue') {
           idle(v.n, t, dt, 0.4)
-          v.t -= dt
+          // An empty stand: they give up sooner and leave empty-handed.
+          const stocked = game.state.stand.eggs > 0
+          v.t -= stocked ? dt : dt * 3
           if (v.t <= 0) {
             v.state = 'out'
-            v.carton.visible = true
-            v.n.holds = true
+            v.carton.visible = stocked
+            v.n.holds = stocked
             const g = v.n.group.position
             const away = v.side ?? 1
             v.w = makeWalker(v.n, [[g.x, g.z], [S.x - away * 7, FARM.sidewalkN.minZ + 1.5], [S.x - away * 45, FARM.sidewalkN.minZ + 1.5]], { speed: rnd(1.3, 1.7), pause: 0 })
             v.w.wait = 0
-            particles?.burst(g.x, 1.4, g.z, { n: 6, colors: ['#ffd23a', '#fff3a0'], speed: 1, up: 2, gravity: -3, life: 0.6, size: 0.24 })
+            if (stocked) particles?.burst(g.x, 1.4, g.z, { n: 6, colors: ['#ffd23a', '#fff3a0'], speed: 1, up: 2, gravity: -3, life: 0.6, size: 0.24 })
           }
         }
       }

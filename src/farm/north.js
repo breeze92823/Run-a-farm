@@ -63,15 +63,19 @@ function railway(root) {
     block(root, len, 0.07, 0.14, steel, cx, 0.48, R.z + (s * R.gauge) / 2, 0, false)
   }
   addSurface({ minX: R.minX, maxX: R.maxX, minZ: R.z - 2.6, maxZ: R.z + 2.6 }, 'gravel')
-  // Fences either side, open at the level crossing.
+  // Fences either side, open at the level crossings (the farm's and Main Street's).
+  const MX = FARM.mainStreet.x
+  const MH = FARM.mainStreet.width / 2 + 1
   fence([[-1200, FARM.railFenceS], [C.x - C.half - 1, FARM.railFenceS]], 'orange')
-  fence([[C.x + C.half + 1, FARM.railFenceS], [1200, FARM.railFenceS]], 'orange')
+  fence([[C.x + C.half + 1, FARM.railFenceS], [MX - MH, FARM.railFenceS]], 'orange')
+  fence([[MX + MH, FARM.railFenceS], [1200, FARM.railFenceS]], 'orange')
   fence([[-1200, FARM.railFenceN], [RA.minX, FARM.railFenceN]], 'white', { collide: true })
-  fence([[RA.maxX, FARM.railFenceN], [1200, FARM.railFenceN]], 'white', { collide: true })
+  fence([[RA.maxX, FARM.railFenceN], [MX - MH, FARM.railFenceN]], 'white', { collide: true })
+  fence([[MX + MH, FARM.railFenceN], [1200, FARM.railFenceN]], 'white', { collide: true })
 }
 
 // --- Level crossing ---------------------------------------------------------------------------
-function crossing(root) {
+function crossing(root, C = FARM.crossing) {
   const g = new Group()
   const plank = M('#8a6440', { roughness: 0.9 })
   for (let i = 0; i < 12; i++) block(g, 0.62, 0.1, 5.4, plank, C.x - C.half + 0.35 + i * 0.68, 0.42, R.z)
@@ -578,6 +582,9 @@ export function buildNorth(root, { addLamp }) {
   const rand = mulberry32(2727)
   railway(root)
   const lights = crossing(root)
+  // Main Street's crossing, on the way from town to the north farm.
+  const MSC = { x: FARM.mainStreet.x, half: FARM.mainStreet.width / 2 }
+  const lights2 = crossing(root, MSC)
   oilField(root)
   ranch(root, rand)
   const pd = pond(root, rand)
@@ -599,6 +606,10 @@ export function buildNorth(root, { addLamp }) {
       const blink = Math.floor(t * 2.2) % 2
       lights.forEach((l, i) => {
         l.material.emissiveIntensity = near && (i % 2) === blink ? 4 : 0
+      })
+      const near2 = s.active && s.headX > MSC.x - 140 && s.tailX < MSC.x + 20
+      lights2.forEach((l, i) => {
+        l.material.emissiveIntensity = near2 && (i % 2) === blink ? 4 : 0
       })
       pd.normal.offset.set(t * 0.01, t * 0.016)
       for (const d of pd.ducks) {

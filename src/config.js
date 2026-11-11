@@ -14,10 +14,16 @@ export const GROUND_Y = 0
 export const FARM = {
   walk: { minX: -150, maxX: 150, minZ: -238, maxZ: 150 }, // invisible walls keep the player off the hills
   walkWest: { minX: -342, maxX: -150, minZ: -58, maxZ: 52 }, // ...plus the Processing Park west of the plot, up to the road's far side
-  // The town east along the road (market + vehicle dealer), walled in with the plot.
-  town: { minX: 150, maxX: 300, minZ: 26, maxZ: 104 },
-  townMarket: { x: 196, z: 76, zone: { minX: 184, maxX: 208, minZ: 41, maxZ: 74 } },
-  dealer: { x: 254, z: 76, reach: 7 },
+  // The rural town east along the road (farm/town.js): shops, the Town Park, the Farmers' Market
+  // and the Vehicle Dealer around the crossroads of the road and Main Street. The town sits in the
+  // middle of the hub (FARM.hub below); the player's own farm is west of it, the other players'
+  // farms north, east and south (FARM.farmSlots).
+  town: { minX: 150, maxX: 430, minZ: -40, maxZ: 160 },
+  // The market hall's front line is at z (it faces the road, north); walking / driving into `zone` sells.
+  townMarket: { x: 214, z: 86, zone: { minX: 189, maxX: 239, minZ: 41, maxZ: 84 } },
+  // The showroom's glass front is at z (facing the road); `desk` = the front desk inside (E: view
+  // vehicles), `lot` = the vehicles for sale out front.
+  dealer: { x: 364, z: 86, reach: 3.2, desk: { x: 364, z: 97.5 } },
   bike: { x: -1.5, z: 31, ry: -0.3 },
   // In front of the barn's drop bay: walking (or driving a truck) in here unloads the bag / loads the truck.
   loadZone: { minX: 24, maxX: 58, minZ: -38, maxZ: -28 },
@@ -35,9 +41,9 @@ export const FARM = {
   // Valleys kept flat out to the horizon so the road and the railway run off into the distance.
   // Valleys kept flat: z = east-west (road, railway), x = the side road south (from minZ).
   corridors: [{ z: 46, half: 22 }, { z: -114, half: 26 }, { x: -150, half: 22, minZ: 30 }],
-  road: { z: 46, width: 12, minX: -900, maxX: 900 },
-  sidewalkN: { minX: -900, maxX: 900, minZ: 37, maxZ: 40 },
-  sidewalkS: { minX: -900, maxX: 900, minZ: 52, maxZ: 55 },
+  road: { z: 46, width: 12, minX: -900, maxX: 455 }, // ends at the east farm's gate
+  sidewalkN: { minX: -900, maxX: 453, minZ: 37, maxZ: 40 },
+  sidewalkS: { minX: -900, maxX: 453, minZ: 52, maxZ: 55 },
   curbHeight: 0.16,
   chickenYard: { minX: -66, maxX: -6, minZ: -12, maxZ: 18 },
   coops: [{ x: -52, z: -5, n: 1 }, { x: -36, z: -5, n: 2 }, { x: -20, z: -5, n: 3 }],
@@ -82,6 +88,9 @@ export const FARM = {
   westPath: { minX: -64, maxX: -59.5, minZ: -98, maxZ: -18 }, // the north-south track from the yard path to the dirt road
   neighbor: { x: -480, z: 4 }, // the next player's farm, seen across the woods past the Processing Park
   northEdge: -92, // z of the plot's north fence
+  // The farm's boundary fence (farm/scenery.js plotFences, farm/boundary.js): one loop round the
+  // whole plot, its gateways at the tracks, paths and drives that leave it.
+  boundary: { minX: -148, maxX: 140, minZ: -92, maxZ: 36.4 },
   northGate: { minX: -10, maxX: -3 }, // opening in the north fence onto the dirt road
   // North of the plot: the wide dirt road, the railway (orange fence on its south side,
   // white ranch fence on its north side), oil barrels, and the ranch beyond.
@@ -97,13 +106,16 @@ export const FARM = {
   train: { every: 85, speed: 19, cars: 7 }, // s between trains, m/s
   // Upgrade pads: name, price, perk line, colour.
   pads: [
-    { x: 3, z: -30, name: 'Fountain', kind: 'DECOR', perk: '+4% customers', price: 900 },
-    { x: -7, z: -30, name: 'Blossom Trees', kind: 'DECOR', perk: '+5% customers', price: 3000 },
-    { x: 98, z: -42, name: 'Flower Garden', kind: 'DECOR', perk: '+6% customers', price: 7500 },
-    { x: -60, z: 30, name: 'Playground', kind: 'DECOR', perk: '+6% customers', price: 6000 },
-    { x: -60, z: -21.5, name: 'Truck Lanterns', kind: 'DECOR', perk: '+2% customers', price: 1500 },
-    { x: -102, z: 33.5, name: 'Street Lamps', kind: 'DECOR', perk: '+3% customers', price: 2250 },
-    { x: -78, z: -5, name: 'Farm Lanterns', kind: 'DECOR', perk: '+2% customers', price: 1800 },
+    // `needs`: buildings (ids, as GAME.buildings) that must stand before the pad shows up. What
+    // each one builds (farm/decor.js, the road's street lamps, the yard's lanterns) is a gate
+    // `pad:<name>`: plain lawn until it is bought.
+    { x: 3, z: -30, name: 'Fountain', kind: 'DECOR', perk: '+4% customers', price: 900, needs: ['seedMarket'] },
+    { x: -7, z: -30, name: 'Blossom Trees', kind: 'DECOR', perk: '+5% customers', price: 3000, needs: ['seedMarket'] },
+    { x: 98, z: -42, name: 'Flower Garden', kind: 'DECOR', perk: '+6% customers', price: 7500, needs: ['storage'] },
+    { x: -60, z: 30, name: 'Playground', kind: 'DECOR', perk: '+6% customers', price: 6000, needs: ['office'] },
+    { x: -60, z: -21.5, name: 'Truck Lanterns', kind: 'DECOR', perk: '+2% customers', price: 1500, needs: ['tractorBay'] },
+    { x: -102, z: 33.5, name: 'Street Lamps', kind: 'DECOR', perk: '+3% customers', price: 2250, needs: ['truckBay'] },
+    { x: -78, z: -5, name: 'Farm Lanterns', kind: 'DECOR', perk: '+2% customers', price: 1800, needs: ['coop2'] },
   ],
 }
 // The west plots as rects, nearest (south-east) first: { rect, n, price, x, z (pad) }.
@@ -127,8 +139,28 @@ export function westPlots() {
 export function plotCrops(rect) {
   return { minX: rect.minX + 1, maxX: rect.maxX - 1, minZ: rect.minZ + 1, maxZ: rect.maxZ - GAME.plots.headland }
 }
-// Inside the walkable area (FARM.walk or its western annex FARM.walkWest)?
-export const inWalk = (x, z) => [FARM.walk, FARM.walkWest].some((r) => x > r.minX && x < r.maxX && z > r.minZ && z < r.maxZ)
+// --- The hub: the rural town with four farms around it -------------------------------------------
+// One room on the server = one town with GAME.net.slots farms. Each client draws its own farm at
+// home (the plot above, west of the town) and the other three slots from the roster (farm/remote.js:
+// a summary farm, or bare land when nobody holds the slot). `farmSlots[k]` is the slot k places
+// round from the viewer's own (1 = north, 2 = east, 3 = south): its centre, and `ry` turns the
+// slot's own frame (W x D m, gate in the middle of its +Z edge) so the gate faces the town.
+Object.assign(FARM, {
+  hub: { minX: 150, maxX: 630, minZ: -312, maxZ: 362 }, // walkable and flat: the town and the three farm slots
+  mainStreet: { x: 290, width: 10, minZ: -142, maxZ: 196 }, // north-south through town, gate to gate
+  slot: { w: 180, d: 160 },
+  farmSlots: [null, { x: 290, z: -222, ry: 0 }, { x: 536, z: 46, ry: -Math.PI / 2 }, { x: 290, z: 276, ry: Math.PI }],
+})
+// The walkable rect of the farm slot k places round (1..3).
+export function slotRect(k) {
+  const s = FARM.farmSlots[k]
+  const turned = Math.abs(Math.sin(s.ry)) > 0.5
+  const hw = (turned ? FARM.slot.d : FARM.slot.w) / 2
+  const hd = (turned ? FARM.slot.w : FARM.slot.d) / 2
+  return { minX: s.x - hw, maxX: s.x + hw, minZ: s.z - hd, maxZ: s.z + hd }
+}
+// Inside the walkable area (FARM.walk, its western annex FARM.walkWest or the town hub)?
+export const inWalk = (x, z) => [FARM.walk, FARM.walkWest, FARM.hub].some((r) => x > r.minX && x < r.maxX && z > r.minZ && z < r.maxZ)
 export const SPAWN = { x: 11, y: 0.2, z: 32 }
 export const SPAWN_FACING = Math.PI // yaw the character faces on spawn (PI = toward -Z, north)
 
@@ -380,10 +412,11 @@ export const GAME = {
   growEvery: 90, // s per lb the weigh-off pumpkin gains
   eventLength: (10 * 24 + 7) * 3600 * 1000, // the weigh-off event, from the first visit
   moon: { first: 90, length: 30, gap: 16 * 60, bonus: 2 }, // Harvest Moon: s until the first, s up, s between, sale multiplier
-  // Always-on boosts shown next to the money (the hat = money, the people = friends).
+  // The boosts shown next to the money (the hat = money, the people = friends).
   boosts: [
-    { id: 'money', label: '+10%', amount: 0.1, title: 'Money Boost', text: '+10% money from every sale' },
-    { id: 'friends', label: '+10%', amount: 0.1, title: 'Friends Boost', text: '+10% money for playing with friends' },
+    // Earned through invites (game.js boostActive, backend invite.ts): `unlock` says how.
+    { id: 'money', label: '+10%', amount: 0.1, title: 'Money Boost', text: '+10% money from every sale', unlock: 'Invite a friend to unlock' },
+    { id: 'friends', label: '+10%', amount: 0.1, title: 'Friends Boost', text: '+10% money for playing with friends', unlock: 'Unlocks when a friend you invited joins' },
   ],
   // Everything the farm makes, with its price at the town market ($ each).
   goods: {
@@ -567,7 +600,8 @@ Object.assign(FARM, {
   orchard: { minX: 70, maxX: 100, minZ: 112, maxZ: 142 },
   lake: { x: 124, z: 128, w: 30, d: 30, dock: { x: 108, z: 128 } },
   helipad: { x: 128, z: 76 },
-  contractBoard: { x: 224, z: 62 },
+  contractBoard: { x: 262, z: 66 },
+  priceBoard: { x: 250, z: 66 }, // MARKET PRICES board by the market's car park
   trophies: { x: -77, z: 31 },
   sheepShed: { x: 118, z: -168, pen: { minX: 92, maxX: 128, minZ: -178, maxZ: -146 } },
   goatBarn: { x: 112, z: -224, pen: { minX: 64, maxX: 128, minZ: -232, maxZ: -192 } },
@@ -683,7 +717,7 @@ Object.assign(GAME, {
     summer: { name: 'Summer', grow: 1.1, customers: 1.25 },
   },
   // The Pumpkin Weigh-off Festival: on the last autumn day, judged at the end.
-  festival: { from: 0.2, to: 0.6, perLb: 18, xp: 400 },
+  festival: { enabled: false, from: 0.2, to: 0.6, perLb: 18, xp: 400 }, // enabled: false = event switched off for now
   // Animal care: troughs empty over `food` / `water` s; happiness scales production.
   care: { food: 420, water: 300, min: 0.25, sad: 0.35, happy: 0.8, feeder: { price: 2.5 }, refillBelow: 0.45 },
   babyGrow: 180, // s for a newborn animal to grow up
@@ -755,7 +789,7 @@ Object.assign(GAME, {
     { id: 'coop2', text: 'Buy Coop 2', sub: 'Stand on its build pad' },
   ],
   // Visitors: walkers per customer a minute, horse riders per horse.
-  visitors: { perCustomer: 0.15, max: 8, vetEvery: [180, 360] },
+  visitors: { perCustomer: 0.25, max: 8, vetEvery: [180, 360] },
   // Distance (m) beyond which small moving models are hidden (phone performance).
   lod: { far: 70, farLow: 50 },
 })
@@ -811,4 +845,15 @@ export function coerceSetting(key, raw) {
   if (spec.type === 'enum') return spec.values.includes(value) ? value : spec.def
   const n = Number(value)
   return clamp(Number.isFinite(n) ? n : Number(spec.def), spec.min, spec.max)
+}
+
+// --- Multiplayer: the farms around the town (net.js, farm/remote.js) ---------------------------------
+// A room holds `slots` players (backend FARM_SLOTS / ROOM_MAX_CLIENTS); each holds one farm slot.
+// The farm summary goes up at most every `farmEvery` s when it changed; the pose `poseHz` times a
+// second while moving. Remote players are drawn as farmers with a name tag in `shirts` colours.
+GAME.net = {
+  slots: 4,
+  farmEvery: 4,
+  poseHz: 6,
+  shirts: ['#d63a2c', '#2f6fd0', '#e0a43a', '#8a5ad8'],
 }

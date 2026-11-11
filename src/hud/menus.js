@@ -3,6 +3,7 @@ import * as game from '../game.js'
 import * as audio from '../audio/core.js'
 import { GOOD_ICONS, ICONS, SEED_ICONS } from './icons.js'
 import { btn, el, openWindow } from './window.js'
+import { boostCard, openInvite } from './invite.js'
 import { dealerExtras, officeExtras, openPrices, ranchExtras, settingsExtras } from './menus2.js'
 import { known as goodKnown, priceMult, trend, hotItem } from '../econ/prices.js'
 import { restartTutorial, skipTutorial, tutorialOn } from '../econ/tutorial.js'
@@ -60,10 +61,11 @@ export function openShop() {
         grid.append(c)
       }
       body.append(grid)
-      body.append(el('p', 'uiw-sub', '<br>Active boosts'))
+      body.append(el('p', 'uiw-sub', '<br>Boosts (earned by inviting friends)'))
       const boosts = el('div', 'uiw-grid')
       for (const b of GAME.boosts) {
-        const c = card({ icon: b.id === 'money' ? ICONS.boostMoney : ICONS.boostFriends, name: b.title, text: b.text, meta: 'ACTIVE' })
+        const c = boostCard(b)
+        if (!game.boostActive(b)) c.append(btn('gold', 'INVITE', () => openInvite()))
         boosts.append(c)
       }
       body.append(boosts)
