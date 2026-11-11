@@ -4,6 +4,7 @@
 import { Client } from '@colyseus/sdk'
 import * as bloxity from './bloxity.js'
 import * as game from './game.js'
+import * as analytics from './analytics.js'
 import { GAME } from './config.js'
 
 const DEV_URL = import.meta.env.VITE_SERVER_URL || (import.meta.env.DEV ? 'ws://localhost:2567' : '')
@@ -13,6 +14,7 @@ let canSave = false // only once the server has answered the load (never overwri
 let pending = null // latest save JSON waiting to be sent
 let userId = ''
 let retry = 0
+let offlineSent = false // Net:Offline sent for this outage
 
 const status = { connected: false, signedIn: false }
 export const netStatus = () => status
@@ -191,6 +193,8 @@ async function open() {
   canSave = false
   status.connected = true
   retry = 0
+  offlineSent = false
+  analytics.design('Net:Joined')
   farmKey = ''
   // The portal's invites and Open Rooms land in this room.
   bloxity.updateRoom(r.roomId)
@@ -231,6 +235,7 @@ async function open() {
 
   // An unexpected close (pod replaced, network) resolves again and rejoins (Bloxity rule).
   r.onLeave(() => {
+    analytics.design('Net:Dropped')
     status.connected = false
     bloxity.updateRoom('')
     room = null
@@ -252,6 +257,9 @@ async function connect() {
     await open()
   } catch (e) {
     console.info('[net] server unavailable, playing on the local save', e?.message ?? e)
+    // Once per outage (reset by a successful join).
+    if (!offlineSent) analytics.design('Net:Offline')
+    offlineSent = true
     reconnect()
   } finally {
     connecting = false

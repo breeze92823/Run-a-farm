@@ -1,6 +1,7 @@
 import { ACESFilmicToneMapping, Clock, Group, PCFSoftShadowMap, PerspectiveCamera, Scene, SRGBColorSpace, WebGLRenderer } from 'three'
 import { CAMERA, graphicsPreset, RENDER } from './config.js'
 import * as bloxity from './bloxity.js'
+import * as analytics from './analytics.js'
 import { inputState, install as installInput, onKey, onWorldClick } from './input.js'
 import { installTouch } from './touch.js'
 import { onViewportChange, viewport } from './viewport.js'
@@ -59,6 +60,8 @@ function applySetting(key, value) {
 }
 bloxity.onSetting(applySetting)
 bloxity.init()
+// Started before the heavy loading, so sessions that quit while loading still show up.
+analytics.install()
 
 // --- Renderer ---------------------------------------------------------------
 const preset = graphicsPreset(bloxity.settings.graphics_quality)
@@ -344,6 +347,7 @@ function frame(dtOverride) {
     if (avatarReady || readySince > 5) {
       shownLoading = false
       bloxity.notifyFirstFrame()
+      analytics.loadDone()
     }
   }
 }

@@ -55,12 +55,18 @@ jobs:
         # VITE_DEV_MODE is deliberately unset so deployed builds use the real Bloxity SDK/CDN.
         # No server URL: built games always reach Run-a-farm-backend through the
         # Bloxity matchmaker (Legion.SDK.net.resolveEndpoint in src/bloxity.js).
+        # GameAnalytics (src/analytics.js) only for prod, so dev-channel tests don't mix into the
+        # real numbers; without the GA_GAME_KEY / GA_SECRET_KEY secrets analytics stays off.
         run: |
+          export VITE_BUILD_ID="${{ steps.channel.outputs.channel }}-${GITHUB_SHA::7}"
           if [ "${{ steps.channel.outputs.channel }}" = "prod" ]; then
-            npm run build
+            VITE_GA_GAME_KEY="${GA_GAME_KEY}" VITE_GA_SECRET_KEY="${GA_SECRET_KEY}" npm run build
           else
             npm run build:dev
           fi
+        env:
+          GA_GAME_KEY: ${{ secrets.GA_GAME_KEY }}
+          GA_SECRET_KEY: ${{ secrets.GA_SECRET_KEY }}
 
       - name: Zip build
         run: cd dist && zip -r ../build.zip . && cd ..
