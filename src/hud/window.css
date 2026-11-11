@@ -7,9 +7,8 @@
   align-items: center;
   justify-content: center;
   padding: calc(var(--uiw-top, 0px) + 28px) max(12px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
-  background: rgba(28, 18, 8, 0.38);
-  -webkit-backdrop-filter: blur(5px);
-  backdrop-filter: blur(5px);
+  /* A plain dim, no backdrop blur: blurring the live 3D canvas costs a full-screen pass every frame. */
+  background: rgba(28, 18, 8, 0.5);
   font-family: 'Fredoka', system-ui, sans-serif;
   touch-action: none;
   animation: uiw-fade 0.16s ease-out;

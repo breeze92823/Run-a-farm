@@ -815,6 +815,24 @@ Object.assign(GAME, {
 // Phone performance: shadows on small moving parts stay on for these presets only.
 export const SMALL_SHADOWS = { Low: false, Medium: false, High: true, Ultra: true }
 
+// --- Performance (perf.js) ------------------------------------------------------
+// Draw distance: every mesh / sprite in the scene stops drawing once it would look smaller than
+// `angle` (its radius / its distance from the camera, ~ a few pixels), never closer than `near` m
+// and always beyond `far` m (measured to its near edge, so hills and big merged buildings stay).
+// Hidden meshes skip the main and the shadow pass. Flag a group `userData.noCull` to keep it out.
+export const CULL = {
+  Low: { angle: 0.008, near: 50, far: 650 },
+  Medium: { angle: 0.005, near: 60, far: 950 },
+  High: { angle: 0.003, near: 70, far: 1400 },
+  Ultra: { angle: 0.002, near: 90, far: Infinity },
+  pass: 0.25, // s for one sweep over every mesh (spread over the frames in between)
+  rescan: 2, // s between looks for meshes added since (bought buildings, other farms)
+}
+// Auto resolution: when the frame rate stays under `lowFps` for `lowFor` s the pixel ratio steps
+// down by `step` (to no less than `minScale` x the preset's); it climbs back once the game holds
+// `highFps` for `highFor` s. Windows open (the scene behind them drawn at half rate) do not count.
+export const AUTO_RES = { lowFps: 45, highFps: 56, lowFor: 2, highFor: 5, step: 0.15, minScale: 0.6, minDpr: 0.6 }
+
 // --- Audio (audio/) --------------------------------------------------------------------
 export const AUDIO = {
   volume: 0.8,
@@ -826,6 +844,12 @@ export const AUDIO = {
   latency: 0.04,
   latencyTouch: 0.07,
   lead: 0.02,
+  // Overlap control (core.js voice()): the same named sound is skipped if started again within
+  // `sameGap` s or with `maxSame` copies still sounding; `headroom` trims the bus glue's
+  // automatic makeup gain before the limiter + soft clipper.
+  sameGap: 0.06,
+  maxSame: 3,
+  headroom: 0.7,
   // Outdoor farm reverb: little pre-delay, a few soft reflections off the barn and bay walls, short airy tail.
   reverb: { seconds: 1.6, preDelay: 0.018, early: [[23, 0.32], [41, 0.22], [67, 0.15], [103, 0.09]], decay: 1.1, tail: 0.13, darken: 2.2, send: 0.8 },
   // Positional sounds: full level inside `near` m, fading to silence at `far` m (from the player).

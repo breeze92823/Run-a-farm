@@ -10,7 +10,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet" />
     <style>
       html, body { margin: 0; height: 100%; overflow: hidden; background: #9fd0ee; overscroll-behavior: none; }
-      canvas { display: block; touch-action: none; }
+      /* Always the whole screen, even in the moment between a phone rotating and the renderer resizing. */
+      canvas { display: block; touch-action: none; position: fixed; inset: 0; width: 100% !important; height: 100% !important; }
       body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
     </style>
   </head>

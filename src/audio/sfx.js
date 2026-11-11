@@ -12,17 +12,17 @@ import { place, posLoop, quack as duckQuack, register, voiced } from './farm.js'
 //  - animals: moos, oinks, neighs and hoof clops, quacks
 //  - money: the cash register at the town market, carton thumps
 
-const ok = (x, z, far, s = 1, pr = 0.5, near) => {
+const ok = (x, z, far, s = 1, pr = 0.5, near, key = null, gap) => {
   if (!ready()) return null
   const p = place(x, z, far, near)
-  if (p.level < 0.02 || !voice(s, pr)) return null
+  if (p.level < 0.02 || !voice(s, pr, key, gap)) return null
   p.t = A.ctx.currentTime + 0.02
   return p
 }
 
 // --- Building -------------------------------------------------------------------------------------------
 export function build(x, z) {
-  const p = ok(x, z, 120, 2.5, 1, 10)
+  const p = ok(x, z, 120, 2.5, 1, 10, 'build', 0.6)
   if (!p) return
   const { t, pan, verb, level } = p
   for (let i = 0; i < 5; i++) modal({ t: t + i * 0.16, f: rnd(180, 260), modes: [[1, 1, 0.09], [2.3, 0.6, 0.06], [4.4, 0.3, 0.04]], gain: 0.35 * level, pan, verb, strike: 0.6, bus: A.sfx })
@@ -38,38 +38,38 @@ export function till(x, z) {
   register(x, z)
 }
 export function cartonThump(x, z) {
-  const p = ok(x, z, 26, 0.4, 0.3)
+  const p = ok(x, z, 26, 0.4, 0.3, undefined, 'carton', 0.08)
   if (!p) return
   burst({ t: p.t, noise: 'pink', type: 'lowpass', f: 700, a: 0.002, d: 0.07, gain: 0.25 * p.level, pan: p.pan, verb: p.verb })
   modal({ t: p.t, f: rnd(240, 300), modes: [[1, 1, 0.06], [2.1, 0.4, 0.04]], gain: 0.12 * p.level, pan: p.pan, verb: p.verb, bus: A.sfx })
 }
 export function crateThud(x, z, n = 3) {
-  const p = ok(x, z, 40, 1, 0.5)
+  const p = ok(x, z, 40, 1, 0.5, undefined, 'crate', 0.3)
   if (!p) return
   for (let i = 0; i < Math.min(5, n); i++) modal({ t: p.t + i * rnd(0.09, 0.14), f: rnd(130, 190), modes: [[1, 1, 0.12], [2.2, 0.5, 0.07], [3.9, 0.3, 0.05]], gain: 0.32 * p.level, pan: p.pan, verb: p.verb, strike: 0.5, bus: A.sfx })
 }
 
 // --- Vehicles ---------------------------------------------------------------------------------------------
 export function bikeBell() {
-  if (!ready() || !voice(0.8, 0.8)) return
+  if (!ready() || !voice(0.8, 0.8, 'bell', 0.2)) return
   const t = A.ctx.currentTime + 0.02
   for (let i = 0; i < 2; i++) modal({ t: t + i * 0.13, f: 2600, modes: [[1, 1, 0.5], [2.3, 0.5, 0.3], [3.6, 0.25, 0.2]], beat: 7, gain: 0.12, strike: 0.2, bus: A.sfx })
 }
 export function engineStart(kind) {
-  if (!ready() || !voice(1.2, 0.8)) return
-  const t = A.ctx.currentTime + 0.02
   if (kind === 'bike') return bikeBell()
+  if (!ready() || !voice(1.2, 0.8, 'engineStart', 0.4)) return
+  const t = A.ctx.currentTime + 0.02
   const f = kind === 'tractor' ? 38 : 48
   for (let i = 0; i < 6; i++) burst({ t: t + i * 0.09, noise: 'brown', type: 'lowpass', f: 260, a: 0.004, d: 0.07, gain: 0.3, bus: A.sfx })
   tone({ t: t + 0.5, type: 'sawtooth', f: f * 0.7, f2: f * 1.6, glide: 0.35, d: 0.5, a: 0.05, gain: 0.12, lp: 500, bus: A.sfx })
 }
 export function horn(x, z) {
-  const p = ok(x, z, 120, 1.2, 0.8, 6)
+  const p = ok(x, z, 120, 1.2, 0.8, 6, 'vanHorn', 0.5)
   if (!p) return
   for (const [at, len] of [[0, 0.18], [0.26, 0.34]]) for (const f of [415, 523]) tone({ t: p.t + at, type: 'square', f, a: 0.01, hold: len, d: 0.06, gain: 0.05 * p.level, pan: p.pan, verb: p.verb, lp: 1600, bus: A.sfx })
 }
 export function doorSlam(x, z) {
-  const p = ok(x, z, 40, 0.5, 0.4)
+  const p = ok(x, z, 40, 0.5, 0.4, undefined, 'door', 0.15)
   if (!p) return
   burst({ t: p.t, noise: 'brown', type: 'lowpass', f: 400, a: 0.002, d: 0.12, gain: 0.4 * p.level, pan: p.pan, verb: p.verb })
   modal({ t: p.t, f: 140, modes: [[1, 1, 0.1], [2.6, 0.4, 0.05]], gain: 0.2 * p.level, pan: p.pan, verb: p.verb, bus: A.sfx })
@@ -174,13 +174,13 @@ export function rotor(k, x, z, on, rpm) {
   r.set(0.045 * p.level, rpm, p.pan, p.verb)
 }
 export function liftOff(x, z) {
-  const p = ok(x, z, 60, 1.4, 0.4)
+  const p = ok(x, z, 60, 1.4, 0.4, undefined, 'liftOff', 0.3)
   if (!p) return
   burst({ t: p.t, noise: 'pink', type: 'bandpass', f: 300, f2: 1400, q: 0.8, a: 0.4, d: 0.8, gain: 0.2 * p.level, pan: p.pan, verb: p.verb, bus: A.sfx })
   tone({ t: p.t, f: 880, f2: 1320, d: 0.25, a: 0.01, gain: 0.05 * p.level, pan: p.pan, bus: A.sfx })
 }
 export function pickupBeep(x, z) {
-  const p = ok(x, z, 60, 0.6, 0.4)
+  const p = ok(x, z, 60, 0.6, 0.4, undefined, 'pickup', 0.2)
   if (!p) return
   tone({ t: p.t, f: 1320, d: 0.08, a: 0.002, gain: 0.07 * p.level, pan: p.pan, bus: A.sfx })
   tone({ t: p.t + 0.1, f: 1760, d: 0.12, a: 0.002, gain: 0.07 * p.level, pan: p.pan, bus: A.sfx })
@@ -206,7 +206,7 @@ export function trainBrake(x, z) {
   burst({ t: p.t + 1.8, noise: 'white', type: 'highpass', f: 2500, a: 0.05, d: 1.4, gain: 0.25 * p.level, pan: p.pan, verb: p.verb, bus: A.sfx }) // steam hiss
 }
 export function clank(x, z) {
-  const p = ok(x, z, 80, 0.8, 0.5)
+  const p = ok(x, z, 80, 0.8, 0.5, undefined, 'clank', 0.2)
   if (!p) return
   modal({ t: p.t, f: rnd(300, 420), modes: [[1, 1, 0.3], [2.76, 0.5, 0.2], [5.4, 0.3, 0.1]], beat: 3, gain: 0.25 * p.level, pan: p.pan, verb: p.verb, strike: 0.5, bus: A.sfx })
 }

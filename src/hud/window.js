@@ -51,9 +51,13 @@ export function openWindow({ title, icon, theme = 'wood', render, onClose }) {
     overlay,
     body,
     refresh() {
+      // Built off-screen first: when nothing visible changed (most live refreshes) the page keeps
+      // its DOM, so there is no relayout / repaint and no flicker of hover states.
+      const next = document.createElement('div')
+      render(next, api)
+      if (body.childNodes.length && next.innerHTML === body.innerHTML) return
       const scroll = body.scrollTop
-      body.innerHTML = ''
-      render(body, api)
+      body.replaceChildren(...next.childNodes)
       body.scrollTop = scroll
     },
     close(silent = false) {

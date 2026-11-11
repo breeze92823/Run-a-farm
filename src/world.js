@@ -35,6 +35,7 @@ function makeClouds() {
 
 export function createWorld(scene) {
   const clouds = makeClouds()
+  clouds.userData.noCull = true // sky dressing: always drawn (perf.js)
   scene.add(clouds)
   return {
     update(dt) {

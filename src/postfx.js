@@ -35,6 +35,11 @@ export function createPostFx(renderer, scene, camera) {
     get bloom() {
       return bloom // for tuning from the dev console
     },
+    // Where the scene itself is drawn (the HDR bloom buffer, or null = the screen): perf.js
+    // compiles the shaders for this target ahead of time.
+    get sceneTarget() {
+      return enabled && composer ? composer.readBuffer : null
+    },
     // preset: a graphicsPreset() result (bloom + antialias decide the setup).
     configure(preset) {
       enabled = !!preset.bloom

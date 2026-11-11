@@ -3,6 +3,7 @@
 // game fully playable on the default avatar and keyboard controls.
 // Docs: https://docs.bloxity.io/#html5
 import { GAME_SLUG, GAME_TITLE, SETTINGS, DEV_MODE, coerceSetting } from './config.js'
+import { onViewportChange, viewport } from './viewport.js'
 
 // The town's farms = players per room (backend FARM_SLOTS) = the biggest party.
 const MAX_PARTY = 4
@@ -432,10 +433,10 @@ export function onReservedAreas(fn) {
   } catch {
     // Fall back to the estimate below.
   }
-  const update = () => fn(estimatedReservedAreas(window.innerWidth, window.innerHeight))
-  window.addEventListener('resize', update)
+  const update = () => fn(estimatedReservedAreas(viewport.width, viewport.height))
+  const off = onViewportChange(update)
   update()
-  return () => window.removeEventListener('resize', update)
+  return off
 }
 
 // The SDK's estimate (legion-sdk ui.estimatedAreas): an 8 px margin round one row of buttons,

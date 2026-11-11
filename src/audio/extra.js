@@ -12,11 +12,11 @@ import { place } from './farm.js'
 //    oil field) that crossfades as the player moves between them
 
 const now = () => A.ctx.currentTime + 0.02
-const ok = (s = 0.5, p = 1) => ready() && voice(s, p)
+const ok = (s = 0.5, p = 1, key = null, gap) => ready() && voice(s, p, key, gap)
 
 // --- One-shots --------------------------------------------------------------------------------------------
 export function customHorn(id) {
-  if (!ok(1.2, 0.9)) return
+  if (!ok(1.2, 0.9, 'horn', 0.3)) return
   const t = now()
   const sq = (f, at, len, g = 0.06) => tone({ t: t + at, type: 'square', f, a: 0.01, hold: len, d: 0.06, gain: g, lp: 1800, bus: A.sfx })
   if (id === 'truck') {
@@ -31,19 +31,19 @@ export function customHorn(id) {
   }
 }
 export function fanfare() {
-  if (!ok(1.5, 1)) return
+  if (!ok(1.5, 1, 'fanfare', 0.5)) return
   const t = now()
   ;[523, 659, 784, 1046, 784, 1046].forEach((f, i) => tone({ t: t + i * 0.11, type: 'triangle', f, d: i === 5 ? 0.7 : 0.25, a: 0.004, gain: 0.13, verb: 0.3, bus: A.ui }))
   burst({ t: t + 0.55, noise: 'pink', type: 'highpass', f: 6000, a: 0.01, d: 0.5, gain: 0.04, bus: A.ui })
 }
 export function comboTick(n) {
-  if (!ok(0.3, 0.6)) return
+  if (!ok(0.3, 0.6, 'combo', 0.05)) return
   const f = 660 * Math.pow(2, Math.min(n - 2, 14) / 12)
   modal({ t: now(), f, modes: [[1, 1, 0.18], [2.01, 0.4, 0.1]], gain: 0.07, strike: 0.05, bus: A.ui })
 }
 export function splash(x, z) {
   const p = ready() && place(x, z, 40)
-  if (!p || p.level < 0.02 || !voice(0.6, 0.6)) return
+  if (!p || p.level < 0.02 || !voice(0.6, 0.6, 'splash', 0.12)) return
   const t = now()
   burst({ t, noise: 'white', type: 'bandpass', f: 1800, f2: 500, q: 0.6, a: 0.005, d: 0.35, gain: 0.25 * p.level, pan: p.pan, verb: p.verb })
   for (let i = 0; i < 4; i++) tone({ t: t + 0.05 + i * 0.05, f: rnd(700, 1400), f2: rnd(1600, 2400), d: 0.05, gain: 0.04 * p.level, pan: p.pan, bus: A.sfx })
@@ -60,14 +60,14 @@ export function shear(x, z, dt) {
   void z
 }
 export function thunder(delay = 1) {
-  if (!ok(4, 0.9)) return
+  if (!ok(4, 0.9, 'thunder', 1)) return
   const t = now() + delay
   burst({ t, noise: 'white', type: 'lowpass', f: 3000, f2: 400, a: 0.005, d: 0.4, gain: 0.25, verb: 0.6, bus: A.sfx })
   burst({ t: t + 0.1, noise: 'brown', type: 'lowpass', f: 180, a: 0.3, hold: 0.6, d: 2.8, gain: 0.7, verb: 0.8, bus: A.sfx })
   burst({ t: t + 0.6, noise: 'brown', type: 'lowpass', f: 120, a: 0.4, d: 2.2, gain: 0.45, verb: 0.9, bus: A.sfx })
 }
 export function wash() {
-  if (!ok(2, 0.6)) return
+  if (!ok(2, 0.6, 'wash', 1)) return
   const t = now()
   burst({ t, noise: 'pink', type: 'bandpass', f: 1200, q: 0.5, a: 0.3, hold: 1.4, d: 0.6, gain: 0.2, bus: A.sfx })
   for (let i = 0; i < 10; i++) tone({ t: t + rnd(0, 2), f: rnd(900, 1800), f2: rnd(2000, 3000), d: 0.04, gain: 0.03, bus: A.sfx })
@@ -174,14 +174,14 @@ export function updateMusic(dt, focus, enabled = true) {
       const root = KEY[z] + Z.prog[bar]
       const i = tr.step % 8
       const p = Z.pattern[i]
-      if (p >= 0 && voice(0.3, 0.1)) {
+      if (p >= 0) {
         const deg = Z.scale[p % Z.scale.length] + 12 * Math.floor(p / Z.scale.length)
         note(tr, z, tr.next, root + 12 + deg, beat * 1.6, Z.lead)
       }
       // Bass on the downbeats.
-      if (i % 4 === 0 && voice(0.4, 0.1)) tone({ t: tr.next, type: z === 'town' ? 'square' : 'sine', f: hz(root - 12), a: 0.01, d: beat * 3, gain: z === 'town' ? 0.03 : 0.08, lp: 400, bus: tr.g })
+      if (i % 4 === 0) tone({ t: tr.next, type: z === 'town' ? 'square' : 'sine', f: hz(root - 12), a: 0.01, d: beat * 3, gain: z === 'town' ? 0.03 : 0.08, lp: 400, bus: tr.g })
       // A soft chord pad at each bar.
-      if (i === 0 && voice(1, 0.1)) for (const k of [0, 4, 7]) tone({ t: tr.next, type: 'sine', f: hz(root + k), a: 0.4, hold: beat * 4, d: beat * 3, gain: 0.018, bus: tr.g })
+      if (i === 0) for (const k of [0, 4, 7]) tone({ t: tr.next, type: 'sine', f: hz(root + k), a: 0.4, hold: beat * 4, d: beat * 3, gain: 0.018, bus: tr.g })
       tr.next += beat
       tr.step++
     }

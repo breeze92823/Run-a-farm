@@ -243,7 +243,7 @@ function frog(x, z) {
 // --- Things ------------------------------------------------------------------------------------------
 function register(x, z) {
   const p = place(x, z, AUDIO.crowd.far)
-  if (p.level < 0.03 || !voice(1.2, 0.6)) return
+  if (p.level < 0.03 || !voice(1.2, 0.6, 'till', 0.3)) return
   const t = A.ctx.currentTime + 0.02
   const g = AUDIO.register.gain * p.level
   burst({ t, noise: 'pink', type: 'lowpass', f: 600, a: 0.002, d: 0.08, gain: g * 0.8, pan: p.pan, verb: p.verb }) // drawer thunk

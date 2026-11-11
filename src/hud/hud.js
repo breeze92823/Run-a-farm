@@ -10,7 +10,9 @@ import { openInvite } from './invite.js'
 import { mount } from '../mount.js'
 import * as fx from '../audio/sfx.js'
 import { createHudExtras } from './hud2.js'
+import { createSpots } from './spots.js'
 import { shear } from '../audio/extra.js'
+import { onViewportChange, viewport } from '../viewport.js'
 
 // The on-screen HUD, laid out after the reference screenshots (1920x992):
 //   top centre   - HOME, the money bar, two boosts, the Harvest Moon timer, and
@@ -194,6 +196,7 @@ export function createHud({ farm, actions }) {
   const pops = el('div', 'hud-pops')
 
   root.append(top, goalTab, left, stats, hotbar, questBtn, prompt, toasts, pops)
+  const spots = createSpots(farm) // marker pads on the E spots of the upgrade windows
   const extras = createHudExtras({ root, top, left, stats, button, popAt: (...a) => popAt(...a), toast: (t) => toast(t), farm, actions })
 
   // --- Toasts ---------------------------------------------------------------------------------------------
@@ -290,7 +293,7 @@ export function createHud({ farm, actions }) {
     pops.append(p)
     setTimeout(() => p.remove(), 1600)
     if (!coin) return
-    flyCoins(((v.x + 1) / 2) * window.innerWidth, ((1 - v.y) / 2) * window.innerHeight, 7)
+    flyCoins(((v.x + 1) / 2) * viewport.width, ((1 - v.y) / 2) * viewport.height, 7)
   }
   // Coins burst from a screen point and fly in arcs into the money counter.
   let flying = 0
@@ -470,7 +473,7 @@ export function createHud({ farm, actions }) {
   }
   function cardAt(x, y) {
     if (!cam) return null
-    ndc.set((x / window.innerWidth) * 2 - 1, -(y / window.innerHeight) * 2 + 1)
+    ndc.set((x / viewport.width) * 2 - 1, -(y / viewport.height) * 2 + 1)
     ray.setFromCamera(ndc, cam)
     for (const c of [farm.stand.card, ...farm.yard.cards]) {
       if (!visibleUp(c.sprite)) continue
@@ -483,8 +486,8 @@ export function createHud({ farm, actions }) {
   let hovered = null
   function click(e, locked) {
     if (anyWindowOpen()) return false
-    const cx = locked ? window.innerWidth / 2 : e.clientX
-    const cy = locked ? window.innerHeight / 2 : e.clientY
+    const cx = locked ? viewport.width / 2 : e.clientX
+    const cy = locked ? viewport.height / 2 : e.clientY
     const hit = cardAt(cx, cy)
     if (hit) {
       sfx.click()
@@ -494,9 +497,11 @@ export function createHud({ farm, actions }) {
     if (!target) return false
     if (locked) return interact()
     if (!cam) return false
-    ndc.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1)
+    ndc.set((e.clientX / viewport.width) * 2 - 1, -(e.clientY / viewport.height) * 2 + 1)
     ray.setFromCamera(ndc, cam)
     if (target.obj) return ray.intersectObject(target.obj, true).length ? interact() : false
+    // A marker pad on an E spot (spots.js): clicking it uses the prompt it stands for.
+    if (spots.hit(ray, lastPos)) return interact()
     if (!target.office && !target.pad) return false
     const hits = target.office ? officeHits : [target.pad.disc, target.pad.rim, target.pad.label]
     if (!ray.intersectObjects(hits, false).length) return false
@@ -587,8 +592,8 @@ export function createHud({ farm, actions }) {
   // --- Layout --------------------------------------------------------------------------------------------------------
   let reserved = []
   function layout() {
-    const w = window.innerWidth
-    const h = window.innerHeight
+    const w = viewport.width
+    const h = viewport.height
     const touch = document.body.classList.contains('touch-ui')
     const narrow = w < 720
     const short = h < 540 && w > h
@@ -656,11 +661,11 @@ export function createHud({ farm, actions }) {
     const lb = left.getBoundingClientRect().bottom
     if (lb + gap > st.top) {
       // Still too tall: the stats give way too (they stand on the bottom edge).
-      const su = Math.max(0.3, (u * (window.innerHeight - lb - gap - 8)) / (st.height + 20 * u))
+      const su = Math.max(0.3, (u * (viewport.height - lb - gap - 8)) / (st.height + 20 * u))
       stats.style.setProperty('--px', `${Math.min(u, su)}px`)
     }
   }
-  window.addEventListener('resize', layout)
+  onViewportChange(layout)
   new MutationObserver(layout).observe(document.body, { attributes: true, attributeFilter: ['class'] })
   layout()
   requestAnimationFrame(layout) // once the fonts have given the top row its width
@@ -684,6 +689,7 @@ export function createHud({ farm, actions }) {
       game.tick(dt, playerPos)
       updateHover()
       extras.update(dt, playerPos)
+      spots.update(dt)
       if (holding) {
         holding.t += dt
         promptHold.style.width = `${Math.min(1, holding.t / holding.target.hold) * 100}%`

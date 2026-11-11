@@ -123,6 +123,22 @@ function makeImpulse(ctx) {
   return buf
 }
 
+// Output safety: linear up to KNEE, then a tanh shoulder that never passes 1.0.
+// The curve covers inputs of +-CLIP_RANGE (scaled down by `pre` in front of it).
+const CLIP_RANGE = 2
+function softClipCurve() {
+  const KNEE = 0.8
+  const n = 4096
+  const c = new Float32Array(n)
+  for (let i = 0; i < n; i++) {
+    const x = ((i / (n - 1)) * 2 - 1) * CLIP_RANGE
+    const ax = Math.abs(x)
+    const y = ax <= KNEE ? ax : KNEE + (1 - KNEE) * Math.tanh((ax - KNEE) / (1 - KNEE))
+    c[i] = Math.sign(x) * y
+  }
+  return c
+}
+
 // The context itself is made inside the gesture (autoplay rules); the noise buffers,
 // the reverb IR and the bus graph (~2M generated samples: a hitch on a phone) follow
 // a moment later, so the first tap doesn't stall the frame it lands in.
@@ -158,15 +174,27 @@ function buildGraph() {
   glue.ratio.value = 2.5
   glue.attack.value = 0.01
   glue.release.value = 0.25
-  const limit = ctx.createDynamicsCompressor() // brick wall so a stack of rewards never clips
-  limit.threshold.value = -3
+  // A DynamicsCompressor adds automatic makeup gain and lets fast transients
+  // through its look-ahead, so on its own it is no brick wall: a stack of
+  // overlapping one-shots came out above full scale and hard-clipped (crackle).
+  // Trim the glue's makeup back out before the limiter, and end the chain with
+  // a soft clipper so the output can never exceed full scale.
+  const trim = ctx.createGain()
+  trim.gain.value = AUDIO.headroom
+  const limit = ctx.createDynamicsCompressor()
+  limit.threshold.value = -6
   limit.knee.value = 0
   limit.ratio.value = 20
-  limit.attack.value = 0.002
-  limit.release.value = 0.1
+  limit.attack.value = 0.001
+  limit.release.value = 0.12
+  const pre = ctx.createGain() // the clipper's curve spans +-CLIP_RANGE
+  pre.gain.value = 1 / CLIP_RANGE
+  const clip = ctx.createWaveShaper()
+  clip.curve = softClipCurve()
+  clip.oversample = '2x'
   const master = ctx.createGain()
   master.gain.value = 0
-  master.connect(glue).connect(limit).connect(ctx.destination)
+  master.connect(glue).connect(trim).connect(limit).connect(pre).connect(clip).connect(ctx.destination)
 
   const bus = (gain, to = master) => {
     const g = ctx.createGain()
@@ -234,10 +262,24 @@ export function setDucked(on) {
 
 // One-shot voice budget: a burst of rewards on a weak phone skips the extras
 // instead of crackling. Returns false when the voice should not play.
+// `key` names the sound: the same sound started again within `gap` s, or with
+// `AUDIO.maxSame` copies of it already sounding, is skipped. Identical sounds
+// started together don't add up to anything richer, they just stack into one
+// loud phasey spike that slams the limiter and ducks everything else.
 const MAX_VOICES = COARSE_POINTER ? AUDIO.maxVoicesTouch : AUDIO.maxVoices
-export function voice(seconds, priority = 1) {
+const same = new Map() // key -> { last: ctx time, live: copies sounding }
+export function voice(seconds, priority = 1, key = null, gap = AUDIO.sameGap) {
   if (!ready()) return false
-  if (A.voices > MAX_VOICES * priority) return false
+  if (A.voices >= MAX_VOICES * priority) return false
+  if (key) {
+    let k = same.get(key)
+    if (!k) same.set(key, (k = { last: -1, live: 0 }))
+    const t = A.ctx.currentTime
+    if (t - k.last < gap || k.live >= AUDIO.maxSame) return false
+    k.last = t
+    k.live++
+    setTimeout(() => k.live--, seconds * 1000 + 50)
+  }
   A.voices++
   setTimeout(() => A.voices--, seconds * 1000 + 50)
   return true

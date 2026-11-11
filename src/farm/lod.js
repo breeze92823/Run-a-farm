@@ -15,6 +15,7 @@ export function buildLod(root, preset) {
   const entries = []
   root.traverse((o) => {
     if (!o.userData.lod) return
+    o.userData.noCull = true // this module decides their distance, not perf.js
     const meshes = []
     o.traverse((m) => m.isMesh && meshes.push(m))
     entries.push({ o, meshes, r: o.userData.lod === 'big' ? far * 1.6 : far, hidden: false })

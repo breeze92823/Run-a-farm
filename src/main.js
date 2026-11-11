@@ -3,6 +3,7 @@ import { CAMERA, graphicsPreset, RENDER } from './config.js'
 import * as bloxity from './bloxity.js'
 import { inputState, install as installInput, onKey, onWorldClick } from './input.js'
 import { installTouch } from './touch.js'
+import { onViewportChange, viewport } from './viewport.js'
 import { createPlayerBody, interpolate as interpolatePlayer, player, resetPlayer, respawn } from './player.js'
 import { getPitch, getYaw, setCameraSensitivity, syncYawToPlayer, update as updateCamera } from './camera.js'
 import { onModeChanged, toggleMode } from './modes.js'
@@ -12,12 +13,13 @@ import { createWorld } from './world.js'
 import { buildFarm } from './farm/index.js'
 import { initGround, liftPlayer, updateGround } from './farm/ground.js'
 import { createHud } from './hud/hud.js'
-import { closeTopWindow } from './hud/window.js'
+import { anyWindowOpen, closeTopWindow } from './hud/window.js'
 import { hand, selectHotbar } from './game.js'
 import { mount } from './mount.js'
 import { getMode } from './modes.js'
 import * as audioCore from './audio/core.js'
 import { createPostFx } from './postfx.js'
+import { createAutoRes, createCuller, warmUp } from './perf.js'
 import { setNeonBloom } from './propkit.js'
 import { buildDefaultCharacter, loadBaseCharacter } from './avatar/character.js'
 import { applyProportions, attachEquippedAccessories } from './avatar/loader.js'
@@ -35,6 +37,9 @@ import { skipToNext } from './econ/clock.js'
 let lighting = null
 let renderer = null
 let postfx = null
+let autoRes = null // perf.js: pixel ratio that drops while the game lags
+let culler = null // perf.js: draw distance
+let currentPreset = null
 
 // Settings come from the portal's settings menu (or their defaults offline).
 function applySetting(key, value) {
@@ -42,12 +47,14 @@ function applySetting(key, value) {
   else if (key === 'fullscreen') bloxity.requestFullscreen(value)
   else if (key === 'graphics_quality' && renderer) {
     const next = graphicsPreset(value)
+    currentPreset = next
     renderer.shadowMap.enabled = next.shadows
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, next.dpr))
+    autoRes.configure(next)
     lighting?.setShadows(next)
     postfx?.configure(next)
     setNeonBloom(next.bloom)
-    postfx?.setSize(window.innerWidth, window.innerHeight)
+    postfx?.setSize(viewport.width, viewport.height)
+    culler?.configure(next)
   }
 }
 bloxity.onSetting(applySetting)
@@ -61,7 +68,9 @@ renderer.toneMapping = ACESFilmicToneMapping
 renderer.toneMappingExposure = RENDER.exposure
 renderer.shadowMap.enabled = preset.shadows
 renderer.shadowMap.type = PCFSoftShadowMap
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, preset.dpr))
+currentPreset = preset
+autoRes = createAutoRes(renderer, () => postfx?.setSize(viewport.width, viewport.height))
+autoRes.configure(preset)
 document.body.appendChild(renderer.domElement)
 // Esc closes an open HUD window first, otherwise opens the portal menu.
 installInput(() => endCine() || closeTopWindow() || bloxity.showMenu(), renderer.domElement)
@@ -71,13 +80,18 @@ const camera = new PerspectiveCamera(CAMERA.fov, 1, CAMERA.near, CAMERA.far)
 postfx = createPostFx(renderer, scene, camera)
 postfx.configure(preset)
 
+// Rotating a phone (portrait <-> landscape) lands here too: viewport.js keeps re-measuring
+// until the browser reports the new size, which `resize` alone often misses on mobile.
 function resize() {
-  renderer.setSize(window.innerWidth, window.innerHeight)
-  postfx.setSize(window.innerWidth, window.innerHeight)
-  camera.aspect = window.innerWidth / window.innerHeight
+  const w = viewport.width
+  const h = viewport.height
+  autoRes.refresh(currentPreset) // moved to a screen with another pixel ratio
+  renderer.setSize(w, h)
+  postfx.setSize(w, h)
+  camera.aspect = w / h
   camera.updateProjectionMatrix()
 }
-window.addEventListener('resize', resize)
+onViewportChange(resize)
 resize()
 
 for (const key of Object.keys(bloxity.settings)) applySetting(key, bloxity.settings[key])
@@ -95,6 +109,7 @@ initGround(scene) // the drawn ground the player and vehicles stand on (ridges, 
 const goHome = () => {
   farm.farm.rideables.dismount()
   respawn()
+  culler?.sweep()
 }
 installEcon({ lighting })
 installNet()
@@ -257,11 +272,18 @@ function updateCine(dt, t) {
 const clock = new Clock()
 let viewOverride = null // dev: a fixed camera for inspecting the scene (__game.view)
 let shownLoading = true
+const CULL_FIRST_PASS = 1e3 // s: a dt long enough for the culler to rescan and sweep everything at once
 let readySince = 0
 
 let simTime = 0
+let frameNo = 0
+let lastNow = performance.now()
 function frame(dtOverride) {
+  const now = performance.now()
+  const realDt = (now - lastNow) / 1000
+  lastNow = now
   const dt = dtOverride ?? Math.min(clock.getDelta(), 0.1) // clamp huge frames (tab switch, breakpoint)
+  frameNo++
   simTime += dt
   const elapsed = simTime
 
@@ -310,7 +332,11 @@ function frame(dtOverride) {
   hud.update(dt, player.renderPosition, camera)
   tickEcon(dt, player)
   lighting.update(dt, playerGroup.position)
-  postfx.render()
+  culler.update(dt)
+  // A window covers the scene (dimmed behind it): draw it every other frame so the UI stays smooth.
+  const windowOpen = anyWindowOpen()
+  if (!windowOpen || frameNo % 2 === 0 || dtOverride !== undefined) postfx.render()
+  if (dtOverride === undefined) autoRes.sample(realDt, windowOpen || !!cine)
 
   // Loading ends once the scene has drawn and the avatar has had its chance (max ~5 s).
   if (shownLoading) {
@@ -321,6 +347,12 @@ function frame(dtOverride) {
     }
   }
 }
+// Draw distance, then shaders / buffers / textures to the GPU while the loading screen still shows.
+culler = createCuller(scene, camera)
+culler.configure(preset)
+bloxity.loadingStep('Preparing graphics')
+warmUp(renderer, scene, camera, postfx)
+culler.update(CULL_FIRST_PASS)
 renderer.setAnimationLoop(() => frame())
 // Ad breaks: the loop stops and the sound mutes until the break ends (Bloxity rule).
 let mutedBeforeAd = false
@@ -332,6 +364,7 @@ bloxity.onAdBreak((on) => {
   } else {
     audioCore.setMuted(mutedBeforeAd)
     clock.getDelta() // don't count the break as one huge frame
+    lastNow = performance.now()
     renderer.setAnimationLoop(() => frame())
   }
 })
@@ -343,11 +376,12 @@ if (import.meta.env.DEV) {
   const teleport = (x, y, z, facing = player.facing) => {
     resetPlayer({ x, y, z }, facing)
     syncYawToPlayer()
+    culler.sweep()
   }
   const view = (...v) => (viewOverride = v.length ? v : null)
   // step(n, dt): run n frames by hand (a hidden tab pauses the animation loop).
   const step = (n = 1, dt = 1 / 30) => {
     for (let i = 0; i < n; i++) frame(dt)
   }
-  window.__game = { player, scene, renderer, camera, postfx, bodies: bodyCount, toggleMode, teleport, farm, lighting, view, audio: audioCore, hud, step }
+  window.__game = { player, scene, renderer, camera, postfx, culler, autoRes, bodies: bodyCount, toggleMode, teleport, farm, lighting, view, audio: audioCore, hud, step }
 }
