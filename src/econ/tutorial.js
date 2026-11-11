@@ -50,17 +50,27 @@ export function restartTutorial() {
   game.emit('tutorial', 0)
 }
 
-// An existing farm (anything built) has no need of it.
-if (!st().done && (game.state.built.length > 0 || game.state.plots.owned.length > 0)) st().done = true
+// An existing farm (anything built) has no need of it. Runs at load and again after a save from the
+// server replaces the state (hydrate).
+function settle() {
+  if (!st().done && (game.state.built.length > 0 || game.state.plots.owned.length > 0)) st().done = true
+}
+settle()
+
+// Selling counts even if the bike step was skipped.
+function sold() {
+  advance('ride')
+  advance('sell')
+}
 
 game.on('collect', () => advance('collect'))
 // The first sale is at the egg stand (restocking it brings the customers); the town market also counts.
-game.on('sale', () => advance('sell'))
+game.on('sale', sold)
 game.on('mount', (m) => m?.kind === 'bike' && advance('ride'))
 game.on('market', ({ source }) => {
-  if (source === 'walk' || source === 'bike' || source === 'truck') advance('sell')
+  if (source === 'walk' || source === 'bike' || source === 'truck') sold()
 })
-game.on('delivered', () => advance('sell'))
+game.on('delivered', sold)
 game.on('build', (b) => {
   if (b.id === 'coop2') advance('coop2')
   if (b.id === 'office') advance('office')
@@ -68,9 +78,14 @@ game.on('build', (b) => {
 // If the bag is already full of eggs at the start, the first step is done.
 game.on('change', () => {
   if (currentStep()?.id === 'collect' && game.bagEggs() > 0) advance('collect')
+  // Buildings bought before their step came up must not leave the tutorial stuck on it.
+  for (let id = currentStep()?.id; id === 'coop2' || id === 'office'; id = currentStep()?.id) {
+    if (!game.built(id)) break
+    advance(id)
+  }
 })
-game.on('reset', () => {
-  // A fresh farm starts the tutorial again (not after a prestige, which sets it done).
-  st().step = 0
-  st().done = false
-})
+// `reset` fires for a new farm (resetProgress: fresh state, tutorial at step 0; a prestige then marks it
+// done) and after a server save is loaded (hydrate: the saved tutorial state). Either way the state
+// already holds the right values, so it must not be touched here (it used to restart the tutorial on
+// every login).
+game.on('reset', settle)
