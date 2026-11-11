@@ -236,7 +236,8 @@ function coopCard(n, x, z, y) {
     ctx.textAlign = 'left'
     ctx.fillStyle = '#3a2414'
     ctx.textBaseline = 'middle'
-    ctx.fillText('8/8', 80, 80)
+    const hens = n === 1 ? GAME.startHens : GAME.hensPerCoop
+    ctx.fillText(`${hens}/${hens}`, 80, 80)
     egg(ctx, 196, 80)
     ctx.fillStyle = '#3a2414'
     ctx.fillText(`${(1 / GAME.layEvery).toFixed(1)}/s`, 214, 80)
@@ -457,6 +458,11 @@ function makeFlock(root, count, rand) {
     }
     return { body, head }
   })
+  // Mix the breeds so the hens shown first (fewer coops built) are not all white.
+  for (let i = hens.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1))
+    ;[hens[i], hens[j]] = [hens[j], hens[i]]
+  }
   return { hens, meshes, pickTarget, blocked }
 }
 
@@ -583,7 +589,7 @@ export function buildChickenYard(root, { addLamp }) {
   void makeNPC
   void makeWalker
 
-  const flock = makeFlock(root, 22, rand)
+  const flock = makeFlock(root, GAME.startHens + (FARM.coops.length - 1) * GAME.hensPerCoop, rand)
   const feathers = makeFeathers(root)
   const o = new Object3D()
   const neck = new Object3D()
@@ -595,8 +601,11 @@ export function buildChickenYard(root, { addLamp }) {
     update(dt, t, player) {
       for (const w of walkers) updateWalker(w, t, dt)
       feathers.update(dt, t)
-      // Eight hens per built coop; the rest stay out of sight.
-      const henCount = Math.min(flock.hens.length, FARM.coops.filter((c) => built(`coop${c.n}`)).length * 8)
+      // Coop 1 starts with GAME.startHens; each other built coop adds GAME.hensPerCoop. The rest stay out of sight.
+      const henCount = Math.min(
+        flock.hens.length,
+        FARM.coops.reduce((s, c) => s + (built(`coop${c.n}`) ? (c.n === 1 ? GAME.startHens : GAME.hensPerCoop) : 0), 0),
+      )
       for (const [i, h] of flock.hens.entries()) {
         h.hidden = i >= henCount
         if (h.hidden) {

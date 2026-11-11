@@ -115,7 +115,7 @@ export function createHud({ farm, actions }) {
   let goalSeen = null // which goal / ready state the card last announced
   top.append(row, goal)
 
-  // --- Left: menu buttons + event card ---------------------------------------------------------
+  // --- Left: menu buttons ---------------------------------------------------------
   const left = el('div', 'hud-left')
   const menuBtn = (cls, icon, label, fn) => {
     const b = button(`hud-menu ${cls}`, `<span class="ico">${ICONS[icon]}</span>`, fn)
@@ -127,11 +127,6 @@ export function createHud({ farm, actions }) {
     menuBtn('m-settings', 'settings', 'SETTINGS', () => openSettings(actions)),
     menuBtn('m-index', 'index', 'INDEX', () => openIndex()),
   )
-  const event = el('div', 'hud-event')
-  event.append(outlined('event-title', 'WEIGH-OFF EVENT'), el('span', 'event-ico', ICONS.pumpkin))
-  const eventWeight = outlined('event-weight', '')
-  const eventEnds = el('span', 'event-ends')
-  event.append(eventWeight, eventEnds)
 
   // --- Stats ---------------------------------------------------------------------------------------
   const stats = el('div', 'hud-stats')
@@ -198,7 +193,7 @@ export function createHud({ farm, actions }) {
   const toasts = el('div', 'hud-toasts')
   const pops = el('div', 'hud-pops')
 
-  root.append(top, goalTab, left, event, stats, hotbar, questBtn, prompt, toasts, pops)
+  root.append(top, goalTab, left, stats, hotbar, questBtn, prompt, toasts, pops)
   const extras = createHudExtras({ root, top, left, stats, button, popAt: (...a) => popAt(...a), toast: (t) => toast(t), farm, actions })
 
   // --- Toasts ---------------------------------------------------------------------------------------------
@@ -530,7 +525,6 @@ export function createHud({ farm, actions }) {
     if (m?.kind === 'truck') setBar(sCargo, game.count(game.truckCargo(m.k).items), game.truckCargoMax())
     emptyBtn.style.visibility = bag > 0 ? 'visible' : 'hidden'
     sBag.r.classList.toggle('full', bag >= st.bag.max)
-    eventWeight.textContent = `${st.weight} lb`
     // The goal: the cheapest building / field / vehicle for sale right now.
     const next = game.nextGoal()
     const need = next ? next.price - st.money : 0
@@ -604,10 +598,10 @@ export function createHud({ farm, actions }) {
     fitLeft(u, short)
   }
   // The menu column hangs under Boxity's chat feed and the stats stand on the bottom
-  // edge; on a short window they would meet. Then the column and the event card
+  // edge; on a short window they would meet. Then the column 
   // (and, if that is not enough, the stats) shrink to fit, keeping 44 px tap targets.
   function fitLeft(u, short) {
-    for (const e of [left, event, stats]) e.style.removeProperty('--px')
+    for (const e of [left, stats]) e.style.removeProperty('--px')
     if (short) return
     const gap = 12
     const lt = left.getBoundingClientRect()
@@ -618,7 +612,6 @@ export function createHud({ farm, actions }) {
     let lu = Math.max(minU, (u * room) / lt.height)
     if (lu > u) lu = u
     left.style.setProperty('--px', `${lu}px`)
-    event.style.setProperty('--px', `${lu}px`)
     const lb = left.getBoundingClientRect().bottom
     if (lb + gap > st.top) {
       // Still too tall: the stats give way too (they stand on the bottom edge).
@@ -674,7 +667,6 @@ export function createHud({ farm, actions }) {
       clockT -= dt
       if (clockT <= 0) {
         clockT = 1
-        eventEnds.textContent = `Ends in ${game.fmtLeft(game.state.eventEnds - Date.now())}`
       }
       moonBadge.style.display = game.moon.active ? '' : 'none'
       if (game.moon.active) moonText.textContent = `${Math.ceil(game.moon.left)}s`

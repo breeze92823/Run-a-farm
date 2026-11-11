@@ -407,6 +407,8 @@ export const GAME = {
   customersPerMin: 15,
   nestMax: 8, // eggs a coop's nest crate holds
   layEvery: 3.5, // s per egg per coop
+  hensPerCoop: 8, // hens shown in each bought coop
+  startHens: 1, // hens shown in Coop 1 (the free starting coop)
   reach: 2.8, // m from a nest crate to collect it
   standReach: 4.5, // m from the stand counter to restock it
   growEvery: 90, // s per lb the weigh-off pumpkin gains
@@ -783,10 +785,10 @@ Object.assign(GAME, {
   rare: { chance: 0.01, giant: 5 }, // golden egg / giant crop chance; a giant crop yields 5x
   tutorial: [
     { id: 'collect', text: 'Collect eggs from Coop 1', sub: 'Walk past the nest crate' },
-    { id: 'restock', text: 'Restock the farm stand', sub: 'Walk up to the stand counter' },
     { id: 'ride', text: 'Hop on the bike', sub: 'Press E (or tap the prompt) next to it' },
-    { id: 'sell', text: 'Ride to the town market and sell', sub: 'East along the road: the green SELL HERE square' },
+    { id: 'sell', text: 'Sell your eggs at the egg stand', sub: 'Ride to the stand counter: customers buy what you stock' },
     { id: 'coop2', text: 'Buy Coop 2', sub: 'Stand on its build pad' },
+    { id: 'office', text: 'Buy the Farm Office', sub: 'Stand on its build pad by the cottage to hire workers' },
   ],
   // Visitors: walkers per customer a minute, horse riders per horse.
   visitors: { perCustomer: 0.25, max: 8, vetEvery: [180, 360] },

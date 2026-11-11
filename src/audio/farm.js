@@ -618,7 +618,8 @@ export function createFarmAudio(farm) {
       timers.rooster -= dt
       if (timers.rooster <= 0) {
         timers.rooster = rnd(...AUDIO.rooster.every)
-        const c = FARM.coops[1]
+        // From the middle coop once it is built, else Coop 1 (never an unbuilt coop on bare grass).
+        const c = built(`coop${FARM.coops[1].n}`) ? FARM.coops[1] : FARM.coops[0]
         rooster(c.x, c.z + 3)
       }
 

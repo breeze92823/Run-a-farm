@@ -52,7 +52,6 @@
 .hud .ico svg,
 .stat-ico svg,
 .money-coin svg,
-.event-ico svg,
 .goal-ico svg,
 .slot-ico svg,
 .slot-lock svg,
@@ -349,51 +348,6 @@
   --edge: #1f4a10;
   background: linear-gradient(#6fd24a, #2f8f24);
   border-color: var(--edge);
-}
-
-/* --- Event card ------------------------------------------------------------------------------ */
-.hud-event {
-  position: absolute;
-  left: calc(var(--safe-l) + 158 * var(--px));
-  top: var(--left-top);
-  width: calc(252 * var(--px));
-  height: calc(112 * var(--px));
-  background: #fbf3e3;
-  border: calc(4 * var(--px)) solid #7b4a26;
-  border-radius: calc(10 * var(--px));
-  box-shadow: 0 calc(4 * var(--px)) 0 rgba(90, 50, 22, 0.55);
-}
-.event-title {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(4 * var(--px));
-  text-align: center;
-  font-size: calc(19 * var(--px));
-  -webkit-text-stroke-width: calc(6 * var(--px)) !important;
-}
-.event-ico {
-  position: absolute;
-  left: calc(-10 * var(--px));
-  top: calc(26 * var(--px));
-  width: calc(108 * var(--px));
-  height: calc(86 * var(--px));
-  filter: drop-shadow(0 calc(3 * var(--px)) 0 rgba(0, 0, 0, 0.25));
-}
-.event-weight {
-  position: absolute;
-  left: calc(108 * var(--px));
-  top: calc(28 * var(--px));
-  font-size: calc(44 * var(--px));
-  color: #ffb03a !important;
-  -webkit-text-stroke-color: #6a2a00 !important;
-}
-.event-ends {
-  position: absolute;
-  left: calc(110 * var(--px));
-  bottom: calc(10 * var(--px));
-  font-size: calc(19 * var(--px));
-  color: #4a2a14;
 }
 
 /* --- Stats -------------------------------------------------------------------------------------- */
@@ -826,19 +780,12 @@
 }
 
 /* Short (landscape phones): menu buttons in a column right of centre, stats as a strip
-   under the goal, the event card shrinks to a chip next to the money. */
+   under the goal. */
 .hud.short .hud-left {
   left: auto;
   right: calc(var(--safe-r) + var(--pad) + var(--cluster, 140px) + 14px);
   top: calc(var(--safe-t) + var(--pad) + 52px);
   gap: calc(12 * var(--px));
-}
-.hud.short .hud-event {
-  left: calc(50% - 560 * var(--px));
-  top: auto;
-  bottom: calc(var(--safe-b) + 24px);
-  transform: scale(0.8);
-  transform-origin: left bottom;
 }
 .hud.short .hud-stats {
   left: 50%;

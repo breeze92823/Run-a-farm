@@ -21,13 +21,9 @@ export function stepTarget(bikePos) {
     const n = game.nestState[0]
     return [n.x, n.z]
   }
-  if (s.id === 'restock') return [FARM.stand.x, FARM.stand.z + 2.2]
   if (s.id === 'ride') return bikePos ? [bikePos.x, bikePos.z] : [FARM.bike.x, FARM.bike.z]
-  if (s.id === 'sell') {
-    const z = FARM.townMarket.zone
-    return [(z.minX + z.maxX) / 2, (z.minZ + z.maxZ) / 2]
-  }
-  const b = game.buildingById('coop2')
+  if (s.id === 'sell') return [FARM.stand.x, FARM.stand.z + 2.2]
+  const b = game.buildingById(s.id === 'office' ? 'office' : 'coop2')
   return [b.x, b.z]
 }
 
@@ -58,15 +54,17 @@ export function restartTutorial() {
 if (!st().done && (game.state.built.length > 0 || game.state.plots.owned.length > 0)) st().done = true
 
 game.on('collect', () => advance('collect'))
-game.on('restock', () => advance('restock'))
+// The first sale is at the egg stand (restocking it brings the customers); the town market also counts.
+game.on('sale', () => advance('sell'))
 game.on('mount', (m) => m?.kind === 'bike' && advance('ride'))
 game.on('market', ({ source }) => {
-  // Walking all the way there is fine too.
-  if (currentStep()?.id === 'ride') advance('ride')
   if (source === 'walk' || source === 'bike' || source === 'truck') advance('sell')
 })
 game.on('delivered', () => advance('sell'))
-game.on('build', (b) => b.id === 'coop2' && advance('coop2'))
+game.on('build', (b) => {
+  if (b.id === 'coop2') advance('coop2')
+  if (b.id === 'office') advance('office')
+})
 // If the bag is already full of eggs at the start, the first step is done.
 game.on('change', () => {
   if (currentStep()?.id === 'collect' && game.bagEggs() > 0) advance('collect')
