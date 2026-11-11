@@ -148,6 +148,10 @@ export function createLighting(scene, renderer, preset) {
   const c = new Color()
   const lerp = (a, b, t) => a + (b - a) * t
   const mix = (key, out) => out.set(D[key]).lerp(c.set(N[key]), night)
+  // Weather (econ/clock.js): `dark` 0..1 greys the sky and dims the sun, `flash` is a lightning strike.
+  const wx = { dark: 0, flash: 0, bakedDark: 0 }
+  const grey = new Color('#7d8794')
+  const greyNight = new Color('#1c2230')
 
   function apply() {
     const t = night
@@ -160,6 +164,17 @@ export function createLighting(scene, renderer, preset) {
     mix('hemiGround', hemi.groundColor)
     sun.intensity = lerp(D.sunIntensity, N.sunIntensity, t)
     hemi.intensity = lerp(D.hemiIntensity, N.hemiIntensity, t)
+    if (wx.dark > 0 || wx.flash > 0) {
+      const g = c.copy(grey).lerp(greyNight, t)
+      skyMaterial.uniforms.top.value.lerp(g, wx.dark * 0.75)
+      skyMaterial.uniforms.bottom.value.lerp(g, wx.dark * 0.6)
+      scene.fog.color.lerp(g, wx.dark * 0.6)
+      sun.intensity *= 1 - wx.dark * 0.65
+      hemi.intensity = hemi.intensity * (1 - wx.dark * 0.25) + wx.flash * 2.5
+      skyMaterial.uniforms.top.value.addScalar(wx.flash * 0.5)
+    }
+    scene.fog.near = FOG.near * (1 - wx.dark * 0.5)
+    scene.fog.far = FOG.far * (1 - wx.dark * 0.7)
     scene.environmentIntensity = lerp(D.envIntensity, N.envIntensity, t)
     renderer.toneMappingExposure = lerp(D.exposure, N.exposure, t)
     stars.material.opacity = lerp(D.stars, N.stars, t)
@@ -182,6 +197,7 @@ export function createLighting(scene, renderer, preset) {
     sun,
     addLamp,
     isNight: () => target === 1,
+    nightLevel: () => night, // 0 = day .. 1 = night, eased
     // A world's sky { day, night } (WORLDS): swapped at once, keeping day or night as it is.
     setMoods(sky) {
       if (sky.day === D && sky.night === N) return
@@ -192,6 +208,20 @@ export function createLighting(scene, renderer, preset) {
     },
     toggleDayNight() {
       target = target === 1 ? 0 : 1
+    },
+    // The clock drives the light: 0 = full day .. 1 = full night (eased by update).
+    setNightTarget(v) {
+      target = v
+    },
+    setWeather(dark, flash = 0) {
+      if (Math.abs(dark - wx.dark) < 0.002 && flash === wx.flash) return
+      wx.dark = dark
+      wx.flash = flash
+      apply()
+      if (Math.abs(dark - wx.bakedDark) > 0.12 && flash === 0) {
+        wx.bakedDark = dark
+        bakeEnvironment(night)
+      }
     },
     setShadows(next) {
       sun.castShadow = next.shadows
@@ -204,7 +234,7 @@ export function createLighting(scene, renderer, preset) {
     // Called every frame with the player's position so the sun's shadow box and the sky follow them.
     update(dt, focus) {
       if (night !== target) {
-        const stepAmount = dt / TIME_OF_DAY.transition
+        const stepAmount = Math.max(dt / TIME_OF_DAY.transition * Math.abs(target - night), dt * 0.02)
         night = target > night ? Math.min(target, night + stepAmount) : Math.max(target, night - stepAmount)
         apply()
         if (Math.abs(night - bakedAt) > 0.08 || night === target) bakeEnvironment(night)

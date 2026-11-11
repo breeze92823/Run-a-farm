@@ -3,6 +3,7 @@ import { getYaw, syncYawToPlayer } from './camera.js'
 import { isFirstPerson } from './modes.js'
 import { RAPIER, alpha, onTick, world } from './physics.js'
 import { PHYSICS, PLAYER_DIMS, SPAWN, SPAWN_FACING } from './config.js'
+import { mount } from './mount.js'
 
 // The local player singleton, mutated in place. A kinematic Rapier capsule
 // driven by Rapier's KinematicCharacterController: it slides along walls,
@@ -17,7 +18,6 @@ export const player = {
   grounded: true,
   facing: SPAWN_FACING, // yaw the character model faces, radians
   dims: { ...PLAYER_DIMS },
-  racing: false, // race.js drives position/renderPosition itself; the controller stands still
 }
 
 const HALF = PLAYER_DIMS.height / 2 // capsule centre above the feet
@@ -63,6 +63,7 @@ export function respawn() {
 }
 
 const TAU = Math.PI * 2
+const FROZEN = { x: 0, z: 0 }
 // Turns angle `from` toward `to` by at most maxDelta, the short way round.
 function rotateTowards(from, to, maxDelta) {
   const diff = Math.atan2(Math.sin(to - from), Math.cos(to - from))
@@ -89,7 +90,6 @@ function step(dt) {
   prev.x = player.position.x
   prev.y = player.position.y
   prev.z = player.position.z
-  if (player.racing) return
 
   // Camera-relative ground basis.
   const yaw = getYaw()
@@ -97,15 +97,34 @@ function step(dt) {
   const fwdZ = -Math.cos(yaw)
   const rightX = Math.cos(yaw)
   const rightZ = -Math.sin(yaw)
-  const mv = inputState.move
+  const mv = inputState.frozen ? FROZEN : inputState.move // photo mode: the camera flies, the player stays
   const len = Math.hypot(mv.x, mv.z)
   const scale = len > 1 ? 1 / len : 1
   const wishX = (fwdX * mv.z + rightX * mv.x) * scale
   const wishZ = (fwdZ * mv.z + rightZ * mv.x) * scale
   const speed = inputState.sprint ? PHYSICS.sprintSpeed : PHYSICS.walkSpeed
+  const m = mount.active
 
-  const rate = !player.grounded ? PHYSICS.airAccel : len > 0.01 ? PHYSICS.accel : PHYSICS.decel
-  approach2D(player.velocity, wishX * speed, wishZ * speed, rate * dt)
+  if (m) {
+    // Riding: the vehicle turns toward the stick at its own rate and drives
+    // along its nose (no strafing); it keeps rolling a little while it turns.
+    const wl = Math.min(1, Math.hypot(wishX, wishZ))
+    let throttle = 0
+    if (wl > 0.05) {
+      const want = Math.atan2(wishX, wishZ)
+      const diff = Math.atan2(Math.sin(want - player.facing), Math.cos(want - player.facing))
+      const v = Math.hypot(player.velocity.x, player.velocity.z)
+      const turn = m.turn * (0.35 + 0.65 * Math.min(1, v / (m.speed * 0.4)))
+      player.facing = rotateTowards(player.facing, want, turn * dt)
+      throttle = wl * (0.3 + 0.7 * Math.max(0, Math.cos(diff)))
+    }
+    const top = m.speed * (m.mul ?? 1) * (inputState.sprint ? 1.15 : 1) * throttle
+    approach2D(player.velocity, Math.sin(player.facing) * top, Math.cos(player.facing) * top, (wl > 0.05 ? m.accel : m.accel * 0.8) * dt)
+    if (!m.jump) inputState.jump = false // only a horse jumps
+  } else {
+    const rate = !player.grounded ? PHYSICS.airAccel : len > 0.01 ? PHYSICS.accel : PHYSICS.decel
+    approach2D(player.velocity, wishX * speed, wishZ * speed, rate * dt)
+  }
 
   // Jump: buffered a little before landing, and allowed a little after leaving a ledge.
   if (inputState.jump) {
@@ -115,7 +134,7 @@ function step(dt) {
   sinceGrounded = player.grounded ? 0 : sinceGrounded + dt
   let jumped = false
   if (jumpQueued > 0 && sinceGrounded <= PHYSICS.coyoteTime) {
-    player.velocity.y = PHYSICS.jumpSpeed
+    player.velocity.y = m?.jump ?? PHYSICS.jumpSpeed
     jumpQueued = 0
     sinceGrounded = PHYSICS.coyoteTime + 1
     jumped = true
@@ -149,6 +168,7 @@ function step(dt) {
   }
 
   // The body turns toward its heading; in first person it always faces the view.
+  if (m) return
   if (isFirstPerson()) player.facing = yaw + Math.PI
   else if (Math.hypot(wishX, wishZ) > 0.05) {
     player.facing = rotateTowards(player.facing, Math.atan2(wishX, wishZ), PHYSICS.turnSpeed * dt)

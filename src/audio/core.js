@@ -51,6 +51,7 @@ export function setVolume(v) {
   applyLevel()
 }
 export const isMuted = () => muted
+export const getVolume = () => volume
 export function setMuted(on) {
   muted = !!on
   try {

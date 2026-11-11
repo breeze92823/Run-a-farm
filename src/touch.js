@@ -6,7 +6,7 @@
 //   buttons     - jump, sprint (toggle), camera mode, plus day-night/respawn
 import './touch.css'
 import { COARSE_POINTER, TOUCH } from './config.js'
-import { inputState, requestLock, setTouchMove, setTouchSprint } from './input.js'
+import { inputState, requestLock, setTouchMove, setTouchSprint, worldTap } from './input.js'
 
 const ICONS = {
   day: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>',
@@ -33,6 +33,22 @@ function button(className, html, fn) {
 }
 
 const isFinger = (e) => e.pointerType === 'touch' || e.pointerType === 'pen'
+
+// A finger that lifts quickly without sliding is a tap on the world (buying
+// from the FARM STAND card's button, say), not a look drag or a joystick push.
+function tapWatcher(zone) {
+  const downs = new Map() // pointerId -> { x, y, t }
+  zone.addEventListener('pointerdown', (e) => {
+    if (isFinger(e)) downs.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now() })
+  })
+  zone.addEventListener('pointerup', (e) => {
+    const d = downs.get(e.pointerId)
+    downs.delete(e.pointerId)
+    if (!d || downs.size > 0) return
+    if (performance.now() - d.t < 300 && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 12) worldTap(e)
+  })
+  zone.addEventListener('pointercancel', (e) => downs.delete(e.pointerId))
+}
 
 // Keeps a finger's moves on its zone even when it slides off. Throws if the
 // pointer is already gone; the zone still works without capture.
@@ -149,6 +165,8 @@ export function installTouch(actions) {
   const right = el('div', 'touch-zone touch-right')
   installJoystick(left)
   installLook(right)
+  tapWatcher(left)
+  tapWatcher(right)
 
   const top = el('div', 'touch-top')
   top.append(

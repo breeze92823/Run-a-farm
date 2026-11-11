@@ -1,0 +1,433 @@
+/* Popup windows (window.js). Sized with the HUD scale --u (set on :root by hud.js). */
+.uiw-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--uiw-top, 0px) + 28px) max(12px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  background: rgba(28, 18, 8, 0.38);
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+  font-family: 'Fredoka', system-ui, sans-serif;
+  touch-action: none;
+  animation: uiw-fade 0.16s ease-out;
+}
+.uiw-overlay.closing {
+  animation: uiw-fade 0.16s ease-in reverse forwards;
+}
+.uiw-overlay.closing .uiw {
+  animation: uiw-pop 0.16s ease-in reverse forwards;
+}
+@keyframes uiw-fade {
+  from { opacity: 0; }
+}
+@keyframes uiw-pop {
+  from { transform: scale(0.82); opacity: 0; }
+  70% { transform: scale(1.03); }
+}
+.uiw {
+  position: relative;
+  width: min(760px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #fbf3e3;
+  border: clamp(5px, 1vmin, 8px) solid #7b4a26;
+  border-radius: 18px;
+  box-shadow: 0 0 0 3px #3a1f0e, 0 14px 40px rgba(0, 0, 0, 0.45), inset 0 -6px 0 rgba(123, 74, 38, 0.18);
+  animation: uiw-pop 0.22s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.uiw-title {
+  position: absolute;
+  left: 18px;
+  top: -24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 18px 4px 6px;
+  background: linear-gradient(#c88a4f, #a5662f);
+  border: 4px solid #5a3216;
+  border-radius: 14px;
+  font-size: clamp(20px, 3.4vmin, 30px);
+  font-weight: 700;
+  color: #fff;
+}
+.uiw-title-icon {
+  width: clamp(30px, 5vmin, 44px);
+  height: clamp(30px, 5vmin, 44px);
+  margin-top: -14px;
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.25));
+}
+.uiw-title-icon svg,
+.uiw-close svg {
+  width: 100%;
+  height: 100%;
+}
+.uiw-close {
+  position: absolute;
+  right: -16px;
+  top: -18px;
+  width: 52px;
+  height: 52px;
+  padding: 8px;
+  border: 4px solid #5a0f0a;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ff6a5a, #d62c20 70%);
+  box-shadow: 0 3px 0 #5a0f0a;
+  transform: rotate(-8deg);
+  cursor: pointer;
+  touch-action: none;
+}
+.uiw-close:active {
+  transform: rotate(-8deg) scale(0.92);
+}
+.uiw-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 36px clamp(12px, 2.4vmin, 22px) clamp(12px, 2.4vmin, 22px);
+  color: #3a2414;
+  touch-action: pan-y;
+}
+
+/* Outlined text (stroke under the fill). */
+.ol {
+  -webkit-text-stroke: 0.22em #2a1608;
+  paint-order: stroke fill;
+  color: #fff;
+}
+
+/* --- Content pieces ---------------------------------------------------------------------- */
+.uiw-sub {
+  margin: 0 0 10px;
+  font-size: clamp(14px, 2.2vmin, 18px);
+  font-weight: 600;
+  color: #8a6a4a;
+}
+.uiw-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
+  gap: 12px;
+}
+.uiw-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 10px 10px;
+  background: #fffaf0;
+  border: 3px solid #d8c3a0;
+  border-radius: 14px;
+  text-align: center;
+}
+.uiw-card.locked {
+  background: #efe8da;
+}
+.uiw-card.locked .uiw-card-icon {
+  filter: grayscale(1) brightness(0.55);
+  opacity: 0.6;
+}
+.uiw-card-icon {
+  width: 64px;
+  height: 64px;
+}
+.uiw-card-icon svg {
+  width: 100%;
+  height: 100%;
+}
+.uiw-card-name {
+  font-size: 20px;
+  font-weight: 700;
+}
+.uiw-card-text {
+  font-size: 15px;
+  font-weight: 500;
+  color: #7a5a3a;
+  min-height: 2.4em;
+}
+.uiw-card-meta {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4c8f3a;
+}
+.uiw-level {
+  display: flex;
+  gap: 4px;
+}
+.uiw-level i {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: #e2d4bb;
+  border: 2px solid #b39a74;
+}
+.uiw-level i.on {
+  background: #6cd04a;
+  border-color: #2f7a24;
+}
+
+.uiw-btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 6px 16px;
+  border: 3px solid #1f4a10;
+  border-radius: 12px;
+  background: linear-gradient(#7ee05a, #3fa62e);
+  box-shadow: 0 4px 0 #1f4a10;
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  -webkit-text-stroke: 4px #1f4a10;
+  paint-order: stroke fill;
+  cursor: pointer;
+  touch-action: none;
+}
+.uiw-btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #1f4a10;
+}
+.uiw-btn.red {
+  background: linear-gradient(#ff7a5a, #d6342c);
+  border-color: #5a0f0a;
+  box-shadow: 0 4px 0 #5a0f0a;
+  -webkit-text-stroke-color: #5a0f0a;
+}
+.uiw-btn.gold {
+  background: linear-gradient(#ffe07a, #f2b51f);
+  border-color: #7a4a0a;
+  box-shadow: 0 4px 0 #7a4a0a;
+  -webkit-text-stroke-color: #7a4a0a;
+}
+.uiw-btn.grey,
+.uiw-btn:disabled {
+  background: linear-gradient(#cfc6b6, #a89d8b);
+  border-color: #5e5448;
+  box-shadow: 0 4px 0 #5e5448;
+  -webkit-text-stroke-color: #5e5448;
+  cursor: default;
+}
+.uiw-btn.pop {
+  animation: uiw-btn-pop 0.18s;
+}
+@keyframes uiw-btn-pop {
+  50% { transform: scale(0.92); }
+}
+
+/* Settings rows. */
+.uiw-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: #fffaf0;
+  border: 3px solid #d8c3a0;
+  border-radius: 14px;
+  font-size: 19px;
+  font-weight: 600;
+}
+.uiw-row-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.uiw-row-label svg {
+  width: 34px;
+  height: 34px;
+}
+.uiw-row input[type='range'] {
+  flex: 1;
+  max-width: 260px;
+  min-height: 44px;
+  accent-color: #3fa62e;
+  touch-action: pan-x;
+}
+
+/* Quests. */
+.uiw-quest {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: #fffaf0;
+  border: 3px solid #d8c3a0;
+  border-radius: 14px;
+}
+.uiw-quest-name {
+  font-size: 19px;
+  font-weight: 700;
+}
+.uiw-quest-text {
+  font-size: 15px;
+  color: #7a5a3a;
+}
+.uiw-bar {
+  grid-column: 1 / -1;
+  position: relative;
+  height: 24px;
+  border-radius: 9px;
+  background: #5b3a1e;
+  border: 3px solid #3a1f0e;
+  overflow: hidden;
+}
+.uiw-bar > i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(#8ee86a, #4cb83a);
+}
+.uiw-bar > span {
+  position: relative;
+  display: block;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 18px;
+  color: #fff;
+  -webkit-text-stroke: 3px #2a1608;
+  paint-order: stroke fill;
+}
+
+@media (max-width: 520px) {
+  .uiw-title {
+    left: 10px;
+  }
+  .uiw-close {
+    right: -6px;
+  }
+  .uiw-card-icon {
+    width: 52px;
+    height: 52px;
+  }
+  .uiw-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .uiw-card-name {
+    font-size: 17px;
+  }
+  .uiw-card-text {
+    font-size: 13px;
+  }
+}
+
+/* Farm Office: job cards (2 columns, 1 on narrow screens) and perk rows. */
+.uiw-jobs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  gap: 12px;
+}
+.uiw-jobs.uiw-wide {
+  margin-top: 12px;
+}
+.uiw-job {
+  display: flex;
+  flex-direction: column;
+  background: #fffaf0;
+  border: 3px solid #b8925e;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.uiw-job-head {
+  padding: 6px 12px;
+  background: linear-gradient(#b8783e, #94592a);
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  -webkit-text-stroke: 4px #4a2a10;
+  paint-order: stroke fill;
+}
+.uiw-job-main {
+  display: flex;
+  gap: 10px;
+  padding: 8px 12px 0;
+  align-items: center;
+}
+.uiw-job-icon {
+  flex: none;
+  width: 72px;
+  height: 72px;
+}
+.uiw-job-icon svg {
+  width: 100%;
+  height: 100%;
+}
+.uiw-job-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: #7a5a3a;
+}
+.uiw-job-count {
+  margin-top: 6px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #e08a1e;
+}
+.uiw-job-count.full {
+  color: #3f9a2e;
+}
+.uiw-job-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px 12px;
+}
+.uiw-job-stat {
+  font-size: 15px;
+  font-weight: 700;
+  color: #5a3a1a;
+}
+.uiw-btn.uiw-job-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.05;
+  min-width: 120px;
+}
+.uiw-btn small {
+  font-size: 12px;
+  -webkit-text-stroke-width: 3px;
+}
+.uiw-btn.blue {
+  background: linear-gradient(#7fd0ff, #2f8ad6);
+  border-color: #0f3a5e;
+  box-shadow: 0 4px 0 #0f3a5e;
+  -webkit-text-stroke-color: #0f3a5e;
+}
+.uiw-perk {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #fffaf0;
+  border: 3px solid #d8c3a0;
+  border-radius: 14px;
+}
+.uiw-perk-icon {
+  flex: none;
+  width: 44px;
+  height: 44px;
+}
+.uiw-perk-icon svg {
+  width: 100%;
+  height: 100%;
+}
+.uiw-perk-words {
+  flex: 1;
+  min-width: 0;
+}
+.uiw-perk-name {
+  font-size: 18px;
+  font-weight: 700;
+}
+.uiw-perk-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #8a6a4a;
+}

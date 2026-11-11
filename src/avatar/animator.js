@@ -64,6 +64,11 @@ class PlayerAnimator {
   }
 
   resolveState(dt, input) {
+    if (input.ride) {
+      this.airTime = 0
+      this.setState('ride', 0.15)
+      return
+    }
     if (!input.grounded) {
       // Ignore the few frames of a step down a ledge; only a real drop is airborne.
       this.airTime += dt
@@ -102,6 +107,31 @@ class PlayerAnimator {
         t.add('Spine1', breath * ANIM.idle.breathAmount)
         t.add('Neck1', -breath * ANIM.idle.breathAmount * 0.6)
         t.bobY = breath * ANIM.idle.breathBob
+        break
+      }
+      case 'ride': {
+        // Sitting on a vehicle: legs forward (pedalling on the bike), hands on the bars / wheel.
+        const bike = input.ride === 'bike'
+        this.phase = (this.phase + (bike ? input.speed * 1.2 : 0) * dt) % TAU
+        const s = Math.sin(this.phase)
+        t.reset()
+        if (bike) {
+          t.set('LegL1', -1.0 + s * 0.4)
+          t.set('LegR1', -1.0 - s * 0.4)
+          t.set('LegL2', 1.1 - s * 0.45)
+          t.set('LegR2', 1.1 + s * 0.45)
+        } else {
+          t.set('LegL1', -1.45)
+          t.set('LegR1', -1.45)
+          t.set('LegL2', 1.45)
+          t.set('LegR2', 1.45)
+        }
+        t.set('ArmL1', -1.05, 0, 0.18)
+        t.set('ArmR1', -1.05, 0, -0.18)
+        t.set('ArmL2', 0.35)
+        t.set('ArmR2', 0.35)
+        t.set('Spine1', bike ? 0.3 : 0.05)
+        t.bobY = 0
         break
       }
       case 'run': {

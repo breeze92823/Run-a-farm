@@ -10,6 +10,7 @@ export const inputState = {
   zoom: 0, // wheel notches since the camera last read them (+ = away)
   sprint: false,
   jump: false, // edge: cleared by player.js
+  frozen: false, // photo mode: movement keys fly the camera instead of the player
 }
 
 // One wheel notch per WheelEvent.deltaMode (pixels, lines, pages), so a trackpad
@@ -28,6 +29,17 @@ export function requestLock() {
   if (!canvas || isLocked()) return
   const r = canvas.requestPointerLock?.()
   if (r instanceof Promise) r.catch(() => {})
+}
+
+// A left click / tap on the world goes to fn(event, locked) first; it returns
+// true when it used the click (then the click does not grab the cursor).
+let clickHandler = null
+export function onWorldClick(fn) {
+  clickHandler = fn
+}
+// A quick finger tap on a touch zone (touch.js) counts as a click on the world there.
+export function worldTap(e) {
+  return !!clickHandler?.(e, false)
 }
 
 // Registers a one-shot key (fires on keydown, never on auto-repeat).
@@ -84,6 +96,9 @@ export function install(showMenu, canvasEl) {
   window.addEventListener('pointerdown', (e) => {
     const onWorld = e.target === canvas
     if (e.button === 2 && !isLocked()) orbiting = true
+    // A click (or tap) the game uses (buying from a pad, opening the Farm Office)
+    // is not also a camera grab.
+    if (e.button === 0 && onWorld && clickHandler?.(e, isLocked())) return
     if (e.button === 0 && onWorld && e.pointerType === 'mouse') {
       // A click on the world takes the cursor (Esc gives it back; never on touch: there is no
       // cursor), also mid-race, where the click is a boost tap too. Until the lock lands (or where
