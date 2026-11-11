@@ -16,7 +16,11 @@ import {
 } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { FARM, GAME } from '../config.js'
+import * as game from '../game.js'
 import { nestState, on } from '../game.js'
+
+// The floating coop cards (their hen buttons take clicks, see hud.js).
+const coopCards = []
 import { mulberry32 } from '../textures.js'
 import { E, M, bakeInto, block, box, cyl, gableRoof, gated, inRect, prism, signCanvas, signMaterial, signPanel, solid, solidCyl } from './kit.js'
 import { built } from '../game.js'
@@ -151,7 +155,9 @@ function coop(root, x, z, n, sprites) {
   solid(W / 2 + 0.95, 2, D / 2 + 0.1, x + 0.45, 2, z)
 
   // Floating coop card: name, nests, egg rate, FULL tag.
-  root.add(coopCard(n, x, z, top + rise + 1.4))
+  const card = coopCard(n, x, z, top + rise + 1.4)
+  coopCards.push(card)
+  root.add(card.sprite)
 }
 
 // The floating coop card, as in the reference: a brown "COOP n" tab over a white
@@ -165,6 +171,9 @@ function coopCard(n, x, z, y) {
   c.width = W
   c.height = H
   const nest = nestState.find((k) => k.n === n)
+  const BTN = { x: 236, y: 114, w: 104, h: 40 }
+  let hover = false
+  let pressT = 0
   const rr = (ctx, x0, y0, w, h, r) => {
     ctx.beginPath()
     ctx.roundRect ? ctx.roundRect(x0, y0, w, h, r) : ctx.rect(x0, y0, w, h)
@@ -236,11 +245,12 @@ function coopCard(n, x, z, y) {
     ctx.textAlign = 'left'
     ctx.fillStyle = '#3a2414'
     ctx.textBaseline = 'middle'
-    const hens = n === 1 ? GAME.startHens : GAME.hensPerCoop
-    ctx.fillText(`${hens}/${hens}`, 80, 80)
+    const hens = game.hensIn(n)
+    const henFull = hens >= GAME.henMax
+    ctx.fillText(`${hens}/${GAME.henMax}`, 80, 80)
     egg(ctx, 196, 80)
     ctx.fillStyle = '#3a2414'
-    ctx.fillText(`${(1 / GAME.layEvery).toFixed(1)}/s`, 214, 80)
+    ctx.fillText(`${((hens / GAME.layEvery) * 1).toFixed(1)}/s`, 214, 80)
     // Nest bar.
     const full = eggs >= max
     ctx.fillStyle = '#5b3a1e'
@@ -262,31 +272,61 @@ function coopCard(n, x, z, y) {
     rr(ctx, 26, 118, 192 * f, 32, 7)
     ctx.fill()
     outlined(ctx, full ? 'FULL' : `${eggs}/${max}`, 122, 135, 24, '#ffffff')
-    // Hen slots: FULL (grey).
-    ctx.fillStyle = '#d9d6cf'
-    ctx.strokeStyle = '#8a857a'
+    // Hen button: grey FULL at the hen limit, otherwise a green / amber buy button.
+    const cost = game.henPrice(n)
+    const afford = game.state.money >= cost
+    const lift = pressT > 0 ? 2 : 0
+    ctx.fillStyle = henFull ? '#d9d6cf' : !afford ? '#f2c14a' : hover ? '#8ff06a' : '#6fdc4a'
+    ctx.strokeStyle = henFull ? '#8a857a' : !afford ? '#9a6414' : '#24711a'
     ctx.lineWidth = 4
-    rr(ctx, 236, 114, 104, 40, 10)
+    rr(ctx, BTN.x, BTN.y + lift, BTN.w, BTN.h, 10)
     ctx.fill()
     ctx.stroke()
-    outlined(ctx, 'FULL', 288, 135, 22, '#ffffff', '#6a655a')
+    const ink = henFull ? '#6a655a' : !afford ? '#7a4a08' : '#1f5a14'
+    if (henFull) outlined(ctx, 'FULL', 288, 135 + lift, 22, '#ffffff', ink)
+    else {
+      outlined(ctx, '+ HEN', 288, 126 + lift, 15, '#ffffff', ink)
+      outlined(ctx, game.fmtMoney(cost), 288, 143 + lift, 15, '#ffffff', ink)
+    }
   }
   draw()
   const t = new CanvasTexture(c)
   t.colorSpace = SRGBColorSpace
-  document.fonts?.ready?.then(() => {
+  const redraw = () => {
     draw()
     t.needsUpdate = true
-  })
-  on('nest', (k) => {
-    if (k.n !== n) return
-    draw()
-    t.needsUpdate = true
-  })
+  }
+  document.fonts?.ready?.then(redraw)
+  on('nest', (k) => k?.n === n && redraw())
+  on('change', redraw)
+  on('reset', redraw)
   const s = new Sprite(new SpriteMaterial({ map: t, transparent: true, depthWrite: false }))
   s.scale.set(3.3, 1.62, 1)
   s.position.set(x, y, z)
-  return s
+  return {
+    sprite: s,
+    // Whether a raycast hit (sprite uv, 0,0 = bottom left) is on the hen button.
+    hitButton(uv) {
+      if (!uv) return false
+      const px = uv.x * W
+      const py = (1 - uv.y) * H
+      return px >= BTN.x && px <= BTN.x + BTN.w && py >= BTN.y && py <= BTN.y + BTN.h
+    },
+    setHover(on) {
+      if (hover === on) return
+      hover = on
+      redraw()
+    },
+    press() {
+      pressT = 0.14
+      setTimeout(() => {
+        pressT = 0
+        redraw()
+      }, 140)
+      redraw()
+      return game.buyHen(n)
+    },
+  }
 }
 
 // --- Yard props --------------------------------------------------------------------------
@@ -589,7 +629,7 @@ export function buildChickenYard(root, { addLamp }) {
   void makeNPC
   void makeWalker
 
-  const flock = makeFlock(root, GAME.startHens + (FARM.coops.length - 1) * GAME.hensPerCoop, rand)
+  const flock = makeFlock(root, FARM.coops.length * GAME.henMax, rand)
   const feathers = makeFeathers(root)
   const o = new Object3D()
   const neck = new Object3D()
@@ -597,6 +637,7 @@ export function buildChickenYard(root, { addLamp }) {
 
   return {
     hens: flock.hens,
+    cards: coopCards,
     events,
     update(dt, t, player) {
       for (const w of walkers) updateWalker(w, t, dt)
@@ -604,7 +645,7 @@ export function buildChickenYard(root, { addLamp }) {
       // Coop 1 starts with GAME.startHens; each other built coop adds GAME.hensPerCoop. The rest stay out of sight.
       const henCount = Math.min(
         flock.hens.length,
-        FARM.coops.reduce((s, c) => s + (built(`coop${c.n}`) ? (c.n === 1 ? GAME.startHens : GAME.hensPerCoop) : 0), 0),
+        FARM.coops.reduce((s, c) => s + (built(`coop${c.n}`) ? game.hensIn(c.n) : 0), 0),
       )
       for (const [i, h] of flock.hens.entries()) {
         h.hidden = i >= henCount

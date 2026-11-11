@@ -462,23 +462,33 @@ export function createHud({ farm, actions }) {
   // The FARM STAND card's EGG PRICE + button: a click / tap on it buys the
   // upgrade from anywhere it can be seen (with a locked cursor, the screen
   // centre is the pointer).
-  const card = farm.stand.card
+  // The coop cards' hen buttons work the same way.
   const cardHits = []
-  function onCardButton(x, y) {
-    if (!cam || !card.sprite.visible) return false
+  const visibleUp = (o) => {
+    for (; o; o = o.parent) if (!o.visible) return false
+    return true
+  }
+  function cardAt(x, y) {
+    if (!cam) return null
     ndc.set((x / window.innerWidth) * 2 - 1, -(y / window.innerHeight) * 2 + 1)
     ray.setFromCamera(ndc, cam)
-    cardHits.length = 0
-    card.sprite.raycast(ray, cardHits)
-    return cardHits.length > 0 && card.hitButton(cardHits[0].uv)
+    for (const c of [farm.stand.card, ...farm.yard.cards]) {
+      if (!visibleUp(c.sprite)) continue
+      cardHits.length = 0
+      c.sprite.raycast(ray, cardHits)
+      if (cardHits.length > 0 && c.hitButton(cardHits[0].uv)) return c
+    }
+    return null
   }
+  let hovered = null
   function click(e, locked) {
     if (anyWindowOpen()) return false
     const cx = locked ? window.innerWidth / 2 : e.clientX
     const cy = locked ? window.innerHeight / 2 : e.clientY
-    if (onCardButton(cx, cy)) {
+    const hit = cardAt(cx, cy)
+    if (hit) {
       sfx.click()
-      card.press()
+      hit.press()
       return true
     }
     if (!target) return false
@@ -503,9 +513,13 @@ export function createHud({ farm, actions }) {
     hoverXY = e.pointerType === 'mouse' && e.target?.tagName === 'CANVAS' && !document.pointerLockElement ? [e.clientX, e.clientY] : null
   })
   function updateHover() {
-    const on = !!hoverXY && !anyWindowOpen() && onCardButton(hoverXY[0], hoverXY[1])
-    card.setHover(on)
-    document.body.classList.toggle('hud-hover-btn', on)
+    const now = hoverXY && !anyWindowOpen() ? cardAt(hoverXY[0], hoverXY[1]) : null
+    if (now !== hovered) {
+      hovered?.setHover(false)
+      now?.setHover(true)
+      hovered = now
+    }
+    document.body.classList.toggle('hud-hover-btn', !!now)
   }
 
   // --- Paint ------------------------------------------------------------------------------------------------------

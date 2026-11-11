@@ -1,4 +1,6 @@
-import { FARM, GAME, plotCrops, westPlots } from './config.js'
+import { DEV_MODE, FARM, GAME, plotCrops, westPlots } from './config.js'
+
+const DEV_MONEY = 1e9 // dev mode: the wallet never runs dry
 import { mount, riding } from './mount.js'
 
 // The farm's game state and its economy, shared by the HUD, the windows and the world.
@@ -39,6 +41,7 @@ const fresh = () => ({
   seeds: GAME.seeds.map((s, i) => ({ id: s.id, count: 0, unlocked: i === 0 })), // no free seeds: buy them at the Seed Market
   selected: 0,
   upgrades: {}, // shop item id -> level
+  hens: {}, // coop number -> hens in it (default 1)
   pads: [], // names of bought decor pads
   built: [], // building ids
   plots: { owned: [], up: {}, grow: {}, crop: {}, picked: {} }, // owned plot numbers; plot -> upgrades; plot -> 0..1; plot -> seed id | null; plot -> picked plant indices
@@ -219,6 +222,12 @@ export function earn(amount, source) {
 }
 // Spends if there is enough; returns false (and emits 'deny') if not.
 export function spend(amount, what) {
+  if (DEV_MODE) {
+    // Dev mode: everything is free (state.money is also kept topped up in tick so affordability checks pass).
+    emit('spend', { amount: 0, what })
+    changed()
+    return true
+  }
   if (state.money < amount) {
     emit('deny', { need: amount - state.money, what })
     return false
@@ -448,6 +457,23 @@ export function buyUpgrade(item) {
   emit('toast', { text, kind: 'good' })
   emit('buy', { big: true })
   emit('upgrade', item)
+  return true
+}
+// Hens in coop `n` (each starts with 1; the coop card's button buys more).
+export const hensIn = (n) => Math.min(GAME.henMax, state.hens?.[n] ?? (n === 1 ? GAME.startHens : GAME.hensPerCoop))
+export const henPrice = (n) => Math.round(GAME.henCost * Math.pow(GAME.henGrowth, hensIn(n) - 1))
+export function buyHen(n) {
+  if (hensIn(n) >= GAME.henMax) {
+    emit('toast', { text: `Coop ${n} is full!`, kind: 'info' })
+    return false
+  }
+  if (!built(`coop${n}`)) return false
+  if (!spend(henPrice(n), 'Hen')) return false
+  state.hens = { ...state.hens, [n]: hensIn(n) + 1 }
+  changed()
+  emit('toast', { text: `New hen in Coop ${n}! (${hensIn(n)}/${GAME.henMax})`, kind: 'good' })
+  emit('buy', {})
+  emit('nest', nests.find((k) => k.n === n))
   return true
 }
 export const nestMax = () => GAME.nestMax + upgradeLevel('nests') * 4
@@ -1226,11 +1252,15 @@ export const moon = { active: false, left: 0 }
 const inside = (x, z, r) => x >= r.minX && x <= r.maxX && z >= r.minZ && z <= r.maxZ
 
 export function tick(dt, player) {
+  if (DEV_MODE && state.money < DEV_MONEY) {
+    state.money = DEV_MONEY
+    changed()
+  }
   // Hens lay (in the coops that are built).
   const max = nestMax()
   for (const n of nests) {
     if (n.eggs >= max || !built(`coop${n.n}`)) continue
-    n.t += dt
+    n.t += dt * hensIn(n.n)
     if (n.t >= layEvery()) {
       n.t = 0
       n.eggs++

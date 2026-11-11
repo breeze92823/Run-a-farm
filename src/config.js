@@ -421,8 +421,11 @@ export const GAME = {
   customersPerMin: 15,
   nestMax: 8, // eggs a coop's nest crate holds
   layEvery: 3.5, // s per egg per coop
-  hensPerCoop: 8, // hens shown in each bought coop
-  startHens: 1, // hens shown in Coop 1 (the free starting coop)
+  hensPerCoop: 1, // hens each coop starts with (more are bought on the coop's card)
+  startHens: 1, // hens in Coop 1 (the free starting coop)
+  henMax: 8, // hens a coop holds
+  henCost: 40, // $ for the 2nd hen in a coop
+  henGrowth: 1.4, // price multiplier per hen already bought
   reach: 2.8, // m from a nest crate to collect it
   standReach: 4.5, // m from the stand counter to restock it
   growEvery: 90, // s per lb the weigh-off pumpkin gains
