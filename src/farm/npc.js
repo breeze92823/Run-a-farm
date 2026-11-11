@@ -87,6 +87,7 @@ export function makeNPC(opts = {}) {
   }
   body.add(armL, armR, head)
   // Held item, in the right hand.
+  let load = null
   if (opts.item === 'basket') {
     const basket = new Group()
     basket.position.set(0, -0.82, 0.18)
@@ -99,7 +100,9 @@ export function makeNPC(opts = {}) {
     const tray = new Group()
     tray.position.set(0.56, 0.5, 0.55)
     box(tray, 0.8, 0.08, 0.5, M('#d8c49a'), 0, 0, 0)
-    for (let i = 0; i < 6; i++) cyl(tray, 0.07, 0.07, 0.1, M('#fff7e6'), (i % 3 - 1) * 0.22, 0.09, (Math.floor(i / 3) - 0.5) * 0.2, 8).scale.set(1, 1.3, 1)
+    load = new Group() // the eggs on the tray (hidden while it is empty)
+    for (let i = 0; i < 6; i++) cyl(load, 0.07, 0.07, 0.1, M('#fff7e6'), (i % 3 - 1) * 0.22, 0.09, (Math.floor(i / 3) - 0.5) * 0.2, 8).scale.set(1, 1.3, 1)
+    tray.add(load)
     body.add(tray)
   } else if (opts.item === 'box') {
     armL.rotation.x = armR.rotation.x = -1.2
@@ -112,7 +115,7 @@ export function makeNPC(opts = {}) {
     if (o.isMesh) o.castShadow = true
   })
   const holds = opts.item === 'tray' || opts.item === 'box'
-  return { group: g, legL, legR, armL, armR, body, head, holds, phase: Math.random() * 10 }
+  return { group: g, legL, legR, armL, armR, body, head, holds, load, phase: Math.random() * 10 }
 }
 
 // Idle animation in place.
@@ -146,7 +149,8 @@ export function stride(n, w, amount) {
   n.head.rotation.y = -s * 0.04 * amount
 }
 
-// A walker loops through `path` ([x, z] points), pausing `pause` s at each one.
+// A walker loops through `path` ([x, z] points), pausing `pause` s at each one
+// (a point [x, z, s] pauses s instead; 0 walks straight on).
 export function makeWalker(n, path, { speed = 1.5, pause = 2, y = 0, pingPong = false } = {}) {
   const pts = pingPong ? [...path, ...path.slice(1, -1).reverse()] : path
   const w = { n, pts, i: 0, speed, pause, wait: Math.random() * pause, y, walk: 0, amount: 0 }
@@ -170,7 +174,7 @@ export function updateWalker(w, t, dt) {
   const d = Math.hypot(dx, dz)
   if (d < 0.1) {
     w.i = (w.i + 1) % w.pts.length
-    w.wait = w.pause * (0.6 + Math.random() * 0.8)
+    w.wait = (w.pts[w.i][2] ?? w.pause) * (0.6 + Math.random() * 0.8)
     return
   }
   const step = Math.min(d, w.speed * dt)

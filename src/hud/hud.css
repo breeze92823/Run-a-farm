@@ -65,7 +65,7 @@
 .hud-top {
   position: absolute;
   top: calc(var(--top) + var(--safe-t) + 8 * var(--px));
-  left: 50%;
+  left: var(--top-x, 50%);
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
@@ -726,12 +726,83 @@
   content: '\270B';
   font-size: calc(30 * var(--px));
 }
+/* Long goal texts never run off a phone screen. */
+.hud.narrow .hud-goal,
+.hud.short .hud-goal {
+  width: max-content;
+  min-width: 0;
+  max-width: calc(100vw - var(--safe-l) - var(--safe-r) - 24px);
+}
+.hud.narrow .goal-text,
+.hud.short .goal-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-/* Narrow (phones in portrait): the hotbar rises above the thumbs, the stats sit above it. */
+/* === Phones in portrait (narrow) ===========================================================
+   Two side columns keep the middle of the screen free for the farm:
+     left   SHOP / SETTINGS / INDEX / AWARDS (under Boxity's chat feed)
+     right  day / respawn (touch.js), quests, clock + weather, the folded GOAL tab, toasts
+   bottom: stats over the joystick, the hotbar over the jump cluster, the prompt on the right. */
+.hud.narrow {
+  --rc: calc(var(--left-top) + var(--tb-col, 0px)); /* where the HUD's part of the right column starts */
+}
+.hud.narrow.touch {
+  --tb-col: 108px; /* touch.js day + respawn buttons, stacked */
+}
+.hud.narrow .hud-quests {
+  top: var(--rc);
+  right: calc(var(--safe-r) + var(--pad));
+}
+.hud.narrow .hud-world {
+  top: calc(var(--rc) + 54px);
+  right: calc(var(--safe-r) + var(--pad));
+}
+.hud.narrow .goal-tab {
+  top: calc(var(--rc) + 54px + 70px);
+  transform: none;
+}
+.hud.narrow .goal-tab.ready,
+.hud.short .goal-tab.ready {
+  animation-name: goal-pulse-x;
+}
+@keyframes goal-pulse-x {
+  50% { transform: translateX(-6px); }
+}
+.hud.narrow .hud-toasts {
+  bottom: auto;
+  top: calc(var(--rc) + 54px + 70px + 96px);
+  right: calc(var(--safe-r) + var(--pad));
+  max-width: 62vw;
+}
+/* The hotbar rises above the thumbs, the stats sit above it. */
 .hud.narrow .hud-hotbar {
   bottom: calc(var(--safe-b) + var(--pad) + var(--cluster, 0px) + 18px);
 }
-/* Phones: the hotbar stays one row (the stats sit right above it) and scrolls sideways when full. */
+.hud.narrow .hud-stats {
+  bottom: calc(var(--safe-b) + var(--pad) + var(--cluster, 0px) + 18px + 190 * var(--px));
+}
+.hud.narrow .hud-prompt {
+  bottom: calc(var(--safe-b) + var(--pad) + var(--cluster, 0px) + 18px + 190 * var(--px));
+  left: auto;
+  right: calc(var(--safe-r) + 10px);
+  transform: none;
+}
+.hud.narrow:not(.touch) .hud-hotbar {
+  bottom: calc(var(--safe-b) + 24px);
+}
+.hud.narrow:not(.touch) .hud-stats {
+  bottom: calc(var(--safe-b) + 40px + 190 * var(--px));
+}
+/* The row reaches the screen edges, so the sun hangs under the boosts. */
+.hud.narrow .hud-moon {
+  left: auto;
+  right: 0;
+  top: calc(100% + 2px);
+}
+
+/* Phones: the hotbar stays one row and scrolls sideways when full. */
 .hud.narrow .hotbar-slots,
 .hud.short .hotbar-slots {
   flex-wrap: nowrap;
@@ -760,74 +831,114 @@
 .hud.short .hotbar-slots > .slot:last-child {
   margin-right: auto;
 }
-.hud.narrow .hud-stats {
-  bottom: calc(var(--safe-b) + var(--pad) + var(--cluster, 0px) + 18px + 190 * var(--px));
-}
-.hud.narrow .hud-prompt {
-  bottom: calc(var(--safe-b) + var(--pad) + var(--cluster, 0px) + 18px + 190 * var(--px));
-  left: auto;
-  right: calc(var(--safe-r) + 10px);
-  transform: none;
-}
-.hud.narrow .hud-toasts {
-  max-width: 70vw;
-}
-.hud.narrow:not(.touch) .hud-hotbar {
-  bottom: calc(var(--safe-b) + 24px);
-}
-.hud.narrow:not(.touch) .hud-stats {
-  bottom: calc(var(--safe-b) + 40px + 190 * var(--px));
-}
 
-/* Short (landscape phones): menu buttons in a column right of centre, stats as a strip
-   under the goal. */
+/* === Phones in landscape (short) ===========================================================
+   The money row moves right of Boxity's toolbar (hud.js --top-x) so the whole height is free;
+   everything else hugs the edges:
+     left   stats as a 2 x 2 block under the chat feed
+     right  day / respawn (touch.js), then the clock column with the menu buttons
+            (SHOP / SETTINGS / INDEX / AWARDS / QUESTS) as a 2-wide grid beside it, the GOAL tab
+   bottom: the hotbar between the joystick and the jump cluster, the prompt above it. */
+.hud.short {
+  --tb-row: 0px;
+  --rt: calc(var(--safe-t) + var(--pad) + var(--tb-row)); /* top of the right-hand block */
+  --clock-w: calc(150 * var(--px) + 24px); /* the clock column's width */
+}
+.hud.short.touch {
+  --tb-row: 52px; /* touch.js day + respawn buttons, in a row */
+}
+.hud.short .hud-top {
+  gap: calc(10 * var(--px));
+}
+.hud.short .hud-world {
+  top: var(--rt);
+  right: calc(var(--safe-r) + var(--pad));
+  width: var(--clock-w);
+  align-items: stretch;
+  gap: 4px;
+}
+.hud.short .hw-clock {
+  justify-content: space-between;
+}
+.hud.short .hw-chip {
+  justify-content: center;
+}
 .hud.short .hud-left {
   left: auto;
-  right: calc(var(--safe-r) + var(--pad) + var(--cluster, 140px) + 14px);
-  top: calc(var(--safe-t) + var(--pad) + 52px);
-  gap: calc(12 * var(--px));
+  right: calc(var(--safe-r) + var(--pad) + var(--clock-w) + 8px);
+  top: var(--rt);
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 6px;
+}
+.hud.short .hud-left .hud-menu {
+  width: 44px;
+  height: 44px;
+  padding-bottom: 2px;
+  border-width: 2px;
+  border-radius: 9px;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.15), 0 2px 0 var(--edge);
+}
+.hud.short .hud-left .hud-menu .ico {
+  width: 26px;
+  height: 22px;
+  margin-bottom: 1px;
+}
+.hud.short .hud-left .hud-menu .lbl {
+  font-size: 8px;
+  -webkit-text-stroke-width: 3px;
+}
+/* The quests button joins the menu grid (hud.js moves it in). */
+.hud.short .hud-left .hud-quests {
+  position: relative;
+  top: auto;
+  right: auto;
+  width: 44px;
+  height: 44px;
+}
+.hud.short .goal-tab {
+  top: calc(var(--rt) + 96px);
+  transform: none;
+  min-height: 52px;
 }
 .hud.short .hud-stats {
-  left: 50%;
+  left: calc(var(--safe-l) + var(--pad));
   bottom: auto;
-  top: calc(var(--top) + var(--safe-t) + 8 * var(--px) + 230 * var(--px));
-  transform: translateX(-50%);
-  flex-direction: row;
-  gap: calc(14 * var(--px));
+  top: var(--left-top);
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 2px 10px;
 }
 .hud.short .stat {
-  grid-template-columns: calc(44 * var(--px)) calc(120 * var(--px));
+  grid-template-columns: calc(44 * var(--px)) calc(130 * var(--px));
 }
 .hud.short .stat-ico {
   width: calc(44 * var(--px));
   height: calc(44 * var(--px));
 }
 .hud.short .hud-hotbar {
-  bottom: calc(var(--safe-b) + 18px);
+  bottom: calc(var(--safe-b) + 12px);
+}
+.hud.short .hotbar-slots {
+  max-width: calc(100vw - 2 * (var(--pad) + var(--cluster, 0px) + 12px));
 }
 .hud.short .hud-prompt {
-  bottom: calc(var(--safe-b) + 18px + 190 * var(--px));
+  bottom: calc(var(--safe-b) + 12px + 175 * var(--px));
 }
 .hud.short .hud-toasts {
   top: auto;
-  bottom: calc(var(--safe-b) + var(--pad) + var(--cluster, 140px) + 10px);
+  right: calc(var(--safe-r) + var(--pad));
+  bottom: calc(var(--safe-b) + var(--pad) + var(--cluster, 0px) + 10px);
   max-width: 40vw;
 }
-.hud.short .hud-quests {
-  top: calc(var(--safe-t) + var(--pad) + 58px);
+.hud.short:not(.touch) .hud-toasts {
+  bottom: calc(var(--safe-b) + var(--pad));
 }
 
 /* Mouse over a clickable 3D button (the FARM STAND card's EGG PRICE +). */
 body.hud-hover-btn canvas {
   cursor: pointer;
 }
-/* Phones in portrait: the row reaches the touch buttons, so the sun hangs under the boosts. */
-.hud.narrow .hud-moon {
-  left: auto;
-  right: 0;
-  top: calc(100% + 2px);
-}
-
 /* Coins flying from a sale into the money counter. */
 .fly-coin {
   position: fixed;

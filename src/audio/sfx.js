@@ -200,7 +200,7 @@ export function gurgle(x, z) {
   bubbles({ t: p.t, n: 8, dur: 0.6, f0: 180, f1: 520, gain: 0.08 * p.level, verb: p.verb, bus: A.sfx })
 }
 export function trainBrake(x, z) {
-  const p = ok(x, z, 300, 2.5, 0.8, 20)
+  const p = ok(x, z, 60, 2.5, 0.8, 8)
   if (!p) return
   tone({ t: p.t, type: 'sawtooth', f: 2100, f2: 1700, d: 1.8, a: 0.3, gain: 0.03 * p.level, pan: p.pan, verb: p.verb + 0.2, lp: 3500, bus: A.sfx })
   burst({ t: p.t + 1.8, noise: 'white', type: 'highpass', f: 2500, a: 0.05, d: 1.4, gain: 0.25 * p.level, pan: p.pan, verb: p.verb, bus: A.sfx }) // steam hiss

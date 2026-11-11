@@ -583,17 +583,44 @@ export function createHud({ farm, actions }) {
     root.classList.toggle('touch', touch)
     root.classList.toggle('narrow', narrow && !short)
     root.classList.toggle('short', short)
-    document.documentElement.style.setProperty('--u', String(u))
-    // Boxity's toolbar and chat: push the top row under the toolbar when they would meet,
-    // and the left column under the chat feed.
+    const docStyle = document.documentElement.style
+    docStyle.setProperty('--u', String(u))
+    // Phones: touch.js moves its buttons into the HUD's side columns too. Only touch the body's
+    // classes when they change: the MutationObserver below re-runs layout on every class write.
+    const bodyCls = document.body.classList
+    if (bodyCls.contains('layout-narrow') !== (narrow && !short)) bodyCls.toggle('layout-narrow', narrow && !short)
+    if (bodyCls.contains('layout-short') !== short) bodyCls.toggle('layout-short', short)
+    // Landscape phones: the quests button joins the menu grid; elsewhere it stands on its own.
+    const questHome = short ? left : root
+    if (questBtn.parentNode !== questHome) questHome.append(questBtn)
+    // Boxity's toolbar and chat: slide the top row right of the toolbar when there is room
+    // (landscape phones keep the whole height that way), else push it under the toolbar;
+    // the left column hangs under the chat feed.
     const tb = reserved.find((a) => a.id === 'toolbar')
     const chat = reserved.find((a) => a.id === 'chat')
-    const rowW = top.offsetWidth || 660 * u
+    const rowW = row.offsetWidth || 600 * u
     let topY = 0
-    if (tb && tb.left + tb.width > (w - rowW) / 2 - 6) topY = tb.top + tb.height + 4
+    let topX = w / 2
+    if (tb && tb.left + tb.width > (w - rowW) / 2 - 6) {
+      // Right of the toolbar, clear of the top-right corner (touch buttons, clock).
+      // With touch the menu grid sits under the touch buttons; without, it is level with the row.
+      const rightKeep = touch || !short ? 126 : w - left.getBoundingClientRect().left + 8
+      const x = tb.left + tb.width + 8 + rowW / 2
+      if (short && x + rowW / 2 <= w - rightKeep) topX = x
+      else topY = tb.top + tb.height + 4
+    }
     const leftTop = Math.max(275 * u, (chat ? chat.top + chat.height : tb ? tb.top + tb.height : 0) + 10)
     root.style.setProperty('--top', `${topY}px`)
+    root.style.setProperty('--top-x', `${topX}px`)
+    // Landscape phones: the goal banner (centred under the row) must stop short of the toolbar
+    // on its left and the menu grid on its right.
+    if (short) {
+      const lo = (tb && !topY ? tb.left + tb.width : 0) + 8
+      const hi = left.getBoundingClientRect().left - 8
+      goal.style.maxWidth = `${Math.max(160, 2 * Math.min(topX - lo, hi - topX))}px`
+    } else goal.style.removeProperty('max-width')
     root.style.setProperty('--left-top', `${leftTop}px`)
+    docStyle.setProperty('--hud-col-top', `${leftTop}px`)
     setWindowReserved(tb ? tb.top + tb.height : 0)
     fitLeft(u, short)
   }

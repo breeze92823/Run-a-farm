@@ -120,9 +120,11 @@
   display: flex;
 }
 .hud.short .hud-hint {
-  top: auto;
-  bottom: calc(var(--safe-b) + 92px);
   padding: 4px 12px 4px 6px;
+  max-width: 46vw;
+}
+.hud.narrow .hud-hint {
+  max-width: calc(100vw - 24px);
 }
 .hud.short .hint-words small {
   display: none;
@@ -246,9 +248,16 @@
   font-size: max(22px, calc(40 * var(--px)));
   line-height: 1;
 }
-.hud .touch .hud-horn,
 .hud.touch .hud-horn {
   bottom: calc(var(--safe-b) + 46vmin);
+}
+/* Phones: on the bottom edge just left of the jump cluster, clear of the hotbar and the side columns. */
+.hud.touch.narrow .hud-horn,
+.hud.touch.short .hud-horn {
+  right: calc(var(--safe-r) + var(--pad) + var(--cluster) + 8px);
+  bottom: calc(var(--safe-b) + var(--pad));
+  width: 48px;
+  height: 48px;
 }
 .m-awards {
   --edge: #7a5a08;
@@ -265,20 +274,13 @@
   background: #9dff8a;
   border-radius: 3px;
 }
-/* Narrow / short screens: smaller, tucked away. */
-.hud.narrow .hud-world {
-  top: calc(var(--safe-t) + 108px);
-  right: calc(var(--safe-r) + 6px);
-}
+/* Narrow / short screens: smaller, tucked into the side columns (hud.css places them). */
 .hud.narrow .hw-chip.hot {
   display: none;
 }
 .hud.short .hud-level,
 .hud.short .hw-day {
   display: none;
-}
-.hud.short .hud-world {
-  flex-direction: row;
 }
 
 /* Overview / photo mode: the HUD steps aside. */

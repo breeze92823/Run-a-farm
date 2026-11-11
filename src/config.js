@@ -191,6 +191,20 @@ export const PHYSICS = {
   killY: -6, // sank this far: respawn
 }
 export const PLAYER_DIMS = { radius: 0.75, height: 1.8 } // capsule the character controller moves
+// Visual ground (farm/ground.js): low drawn surfaces with no collider (field ridges, rail
+// ballast, barn floor, pads, raised beds...) that the drawn player and vehicles are lifted onto.
+export const GROUND = {
+  minY: 0.07, // m: surfaces lower than this are decals (the player's feet hide them)
+  maxY: 0.6, // m: surfaces higher than this are obstacles, not ground
+  minNy: 0.85, // a face must point this much up to stand on
+  minArea: 0.1, // m^2 (top view): smaller faces are crop, grass, eggs, leaves
+  reach: 0.5, // m above the feet a surface still counts (higher ones are walked through)
+  dead: 0.04, // m: smaller lifts are ignored (sidewalk texture over its collider)
+  up: 8, // m/s the lift rises onto a surface
+  down: 2.5, // m/s it settles back off one (crossing furrows reads as a small dip)
+  radius: { foot: 0.25, bike: 0.35, horse: 0.6, tractor: 0.9, truck: 1.1, combine: 1.4, sprayer: 1.0 }, // m sampled round the centre
+  rescan: 2, // s between checks for meshes added since (bought plots, other players' farms)
+}
 
 // --- Look ------------------------------------------------------------------
 export const RENDER = { exposure: 1.0 }

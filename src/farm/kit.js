@@ -186,9 +186,29 @@ export function signPanel(parent, w, h, mat, x, y, z, ry = 0) {
 
 // --- Colliders ------------------------------------------------------------------------
 const yawQ = (yaw) => ({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) })
-// Solid box: half extents, centre, yaw.
-export function solid(hx, hy, hz, x, y, z, yaw = 0) {
-  return captured(addFixed(RAPIER.ColliderDesc.cuboid(hx, hy, hz), { x, y, z }, yaw ? yawQ(yaw) : null))
+// Solid box: half extents, centre, yaw. A long box is laid as pieces of at most `piece` m
+// half-length: Rapier's character controller is imprecise against very long boxes and let
+// the player settle 5-10 cm into a 300 m sidewalk (0.4 m into the old 4 km ground slab).
+// Returns the first piece.
+export function solid(hx, hy, hz, x, y, z, yaw = 0, piece = 25) {
+  const nx = Math.ceil(hx / piece - 1e-9)
+  const nz = Math.ceil(hz / piece - 1e-9)
+  const rot = yaw ? yawQ(yaw) : null
+  if (nx * nz <= 1) return captured(addFixed(RAPIER.ColliderDesc.cuboid(hx, hy, hz), { x, y, z }, rot))
+  const cs = Math.cos(yaw)
+  const sn = Math.sin(yaw)
+  const px = hx / nx
+  const pz = hz / nz
+  let first = null
+  for (let i = 0; i < nx; i++) {
+    for (let k = 0; k < nz; k++) {
+      const lx = -hx + px * (2 * i + 1)
+      const lz = -hz + pz * (2 * k + 1)
+      const c = captured(addFixed(RAPIER.ColliderDesc.cuboid(px, hy, pz), { x: x + cs * lx + sn * lz, y, z: z - sn * lx + cs * lz }, rot))
+      first ??= c
+    }
+  }
+  return first
 }
 // Solid box from a rect on the ground, `h` tall.
 export function solidRect(minX, maxX, minZ, maxZ, h, y0 = 0) {

@@ -104,6 +104,7 @@ function buildLand(root) {
   const mat = new MeshStandardMaterial({ map: grass, color: '#d3dcbc', vertexColors: true, roughness: 0.95 })
   const land = new Mesh(geo, mat)
   land.receiveShadow = true
+  land.userData.noGround = true // flat (y = 0) where it can be walked: nothing for farm/ground.js
   root.add(land)
 }
 
@@ -128,6 +129,7 @@ function buildMountains(root) {
   ring.computeVertexNormals()
   const mat = new MeshStandardMaterial({ color: '#7fa5a8', roughness: 1, flatShading: true, side: DoubleSide })
   const m = new Mesh(ring, mat)
+  m.userData.noGround = true
   root.add(m)
   // A second, closer ring of greener forested hills.
   const ring2 = new PlaneGeometry(1, 1, 160, 8)
@@ -142,7 +144,9 @@ function buildMountains(root) {
     p2.setXYZ(i, Math.cos(ang) * r, h, Math.sin(ang) * r)
   }
   ring2.computeVertexNormals()
-  root.add(new Mesh(ring2, new MeshStandardMaterial({ color: '#6f9a5c', roughness: 1, flatShading: true, side: DoubleSide })))
+  const m2 = new Mesh(ring2, new MeshStandardMaterial({ color: '#6f9a5c', roughness: 1, flatShading: true, side: DoubleSide }))
+  m2.userData.noGround = true
+  root.add(m2)
 }
 
 // --- Flat patches ----------------------------------------------------------------------------
@@ -333,7 +337,11 @@ export function buildTerrain(root) {
   }, 0.3)
 
   // --- Colliders -------------------------------------------------------------------------
-  solid(2000, 0.5, 2000, 0, -0.5, 0) // the ground
+  // The ground: 200 m tiles, not one 4 km slab. Against a box that big Rapier's character
+  // controller lost precision and its snap-to-ground pushed the player up to 0.4 m into the
+  // floor in places (by the railway, on pads); tiles this size keep it exact (see kit.js solid).
+  const GT = 100
+  for (let x = -2000 + GT; x < 2000; x += GT * 2) for (let z = -2000 + GT; z < 2000; z += GT * 2) solid(GT, 0.5, GT, x, -0.5, z, 0, GT)
   // Walls around the walkable area (the hills are scenery).
   const W = F.walk
   const h = 30

@@ -67,7 +67,7 @@ export function createHudExtras({ root, top, left, stats, button, popAt, toast, 
   const hintArrow = el('span', 'hint-arrow', '<svg viewBox="0 0 64 64"><path d="M32 4 L54 40 H40 V60 H24 V40 H10 Z" fill="#ffd34a" stroke="#3a1f0e" stroke-width="4" stroke-linejoin="round"/></svg>')
   const hintText = el('span', 'hint-words')
   hint.append(hintArrow, hintText)
-  root.append(hint) // placed under the top block each tick (hud2.css moves it down in short landscape)
+  root.append(hint) // placed under the top block each tick
 
   // --- Combo, course, level-up -------------------------------------------------------------------------
   const comboEl = el('div', 'hud-combo')
@@ -260,8 +260,10 @@ export function createHudExtras({ root, top, left, stats, button, popAt, toast, 
       const step = currentStep()
       hint.classList.toggle('show', !!step)
       if (step) {
-        if (!root.classList.contains('short')) hint.style.top = `${top.getBoundingClientRect().bottom + 8}px`
-        else hint.style.top = ''
+        // Under the top block, centred on it (on landscape phones it sits right of Boxity's toolbar).
+        const tr = top.getBoundingClientRect()
+        hint.style.top = `${tr.bottom + 8}px`
+        hint.style.left = `${tr.left + tr.width / 2}px`
         const txt = `${step.text}`
         if (txt !== lastHint) {
           lastHint = txt

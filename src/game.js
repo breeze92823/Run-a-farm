@@ -777,6 +777,7 @@ function work(dt) {
   const speed = crewSpeed()
   for (const w of GAME.workers) {
     if (w.id === 'oiler') continue // oil workers just keep their pump running (oil, below)
+    if (w.id === 'stocker') continue // stockers walk their trips (farm/workers.js: stockerPick / stockerDrop)
     const n = hired(w)
     const timers = (shifts[w.id] ??= [])
     while (timers.length < n) timers.push(w.every * (0.3 + 0.7 * Math.random()))
@@ -790,25 +791,7 @@ function work(dt) {
   }
 }
 function shift(w, k) {
-  if (w.id === 'stocker') {
-    // Empty the fullest nests into the stand.
-    let room = Math.min(workerCarry(w), state.stand.max - state.stand.eggs)
-    let moved = 0
-    for (const n of [...nests].filter((x) => built(`coop${x.n}`)).sort((a, b) => b.eggs - a.eggs)) {
-      if (room <= 0) break
-      const t = Math.min(room, n.eggs)
-      if (!t) continue
-      n.eggs -= t
-      room -= t
-      moved += t
-      emit('nest', n)
-    }
-    if (!moved) return
-    state.stand.eggs += moved
-    state.stats.collected += moved
-    changed()
-    emit('work', { w, k, n: moved, text: `+${moved} eggs` })
-  } else if (w.id === 'hand') {
+  if (w.id === 'hand') {
     const p = PLOTS.find((q) => q.n === state.plots.owned[k])
     if (p && plotCrop(p) && plotGrowth(p) >= 1) harvestPlot(p, { by: w, k })
   } else if (w.id === 'tractor') {
@@ -839,6 +822,27 @@ function shift(w, k) {
     const r = ranchBuilt()[k]
     if (r) collectRanch(r, 'rancher')
   }
+}
+
+// Stockers (farm/workers.js) walk to the nests and back: they take eggs out of a
+// nest only while standing at it, and the stand fills only once they reach it.
+export function stockerPick(coopN, room) {
+  const n = nests.find((x) => x.n === coopN)
+  if (!n || room <= 0 || !built(`coop${n.n}`)) return 0
+  const t = Math.min(room, n.eggs)
+  if (!t) return 0
+  n.eggs -= t
+  emit('nest', n)
+  return t
+}
+export function stockerDrop(w, k, eggs) {
+  const t = Math.min(eggs, state.stand.max - state.stand.eggs)
+  if (t <= 0) return 0
+  state.stand.eggs += t
+  state.stats.collected += t
+  changed()
+  emit('work', { w, k, n: t, text: `+${t} eggs` })
+  return t
 }
 
 // --- Vehicle trips -------------------------------------------------------------------------------------------------

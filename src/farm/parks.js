@@ -5,6 +5,7 @@ import { E, M, addSurface, bakeInto, block, box, cyl, gated, inRect, signCanvas,
 import { farmTruck, tractor } from './vehicles.js'
 import { env, updateRig } from './rig.js'
 import { paintDirt, tex } from './textures.js'
+import { rideY } from './ground.js'
 
 // The Tractor Park (gravel strip by the west plots) and the Vehicle Park (the
 // drop-off's south-east corner): a slot per vehicle the farm can own, the
@@ -80,7 +81,9 @@ function step(m, dt) {
     const diff = Math.atan2(Math.sin(yaw - o.rotation.y), Math.cos(yaw - o.rotation.y))
     o.rotation.y += diff * Math.min(1, dt * 6)
   }
-  o.position.y = m.yAt(o.position.x, o.position.z)
+  // Its road height, raised onto plot ridges and slabs (eased: it climbs onto a field, not teleports).
+  const y = rideY(o.position.x, o.position.z, m.yAt(o.position.x, o.position.z))
+  o.position.y += (y - o.position.y) * Math.min(1, dt * 10)
   if (m.seg >= m.all.length - 1) {
     m.all = null
     m.moving = false

@@ -112,6 +112,12 @@
   display: flex;
   gap: 10px;
 }
+/* Phones in portrait: Boxity's toolbar spans the top, so day / respawn head the HUD's right
+   column instead (hud.js sets --hud-col-top under the chat feed; hud.css leaves room). */
+.layout-narrow .touch-top {
+  top: max(calc(var(--safe-t) + var(--pad)), var(--hud-col-top, 0px));
+  flex-direction: column;
+}
 .touch-btn.small {
   width: 44px;
   height: 44px;

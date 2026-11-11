@@ -1,4 +1,5 @@
-import { FARM } from '../config.js'
+import { FARM, GROUND } from '../config.js'
+import { restY } from './ground.js'
 import * as game from '../game.js'
 import { mount } from '../mount.js'
 import { player, resetPlayer } from '../player.js'
@@ -42,6 +43,8 @@ export function buildRideables(root, { parks, particles }) {
   // Rideables added by other modules (econ/fleet.js, the horse): { kind, k, g, rig, name, sub(),
   // available(), take(), leave() }.
   const extras = []
+  // Vehicles are never part of the drawn ground (farm/ground.js), even standing still.
+  for (const v of [bike, ...parks.tractors, ...parks.trucks]) v.g.userData.noGround = true
   const all = () => [bike, ...parks.tractors.filter((v) => v.g.visible), ...parks.trucks.filter((v) => v.g.visible), ...extras.filter((v) => v.g.visible && v.available?.() !== false)]
   function nearest(pos) {
     let best = null
@@ -88,7 +91,9 @@ export function buildRideables(root, { parks, particles }) {
     const s = SIDE[v.kind] ?? 2.4
     v.g.position.x = player.position.x + Math.cos(f) * s
     v.g.position.z = player.position.z - Math.sin(f) * s
-    v.g.position.y = v.kind === 'bike' || v.kind === 'horse' ? 0 : 0.03
+    // On whatever is under it: a curb, a ridge, the barn floor (not sunk to y = 0).
+    const base = v.kind === 'bike' || v.kind === 'horse' ? 0 : 0.03
+    v.g.position.y = restY(v.g.position.x, v.g.position.z, player.position.y + 1, GROUND.radius[v.kind] ?? 0) + base
     if (v.kind === 'bike') {
       v.frame.rotation.z = 0.12
       v.stand.visible = true
@@ -110,6 +115,7 @@ export function buildRideables(root, { parks, particles }) {
       return current
     },
     register(v) {
+      v.g.userData.noGround = true
       extras.push(v)
       return v
     },

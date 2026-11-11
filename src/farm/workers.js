@@ -11,14 +11,19 @@ import { idle, makeNPC, makeWalker, updateWalker } from './npc.js'
 //    trip (parks.js) they are in it, so they leave their spot
 // They are added and removed as the hire counts change.
 
-const nestStops = () => FARM.coops.map((c) => [c.x + 1.3, c.z + 1.6])
+// Stocker trip points: the stand counter, the yard walk, and a stop by each built coop's nest
+// (nearest coop first). Waypoints carry a 0 pause so the stocker walks straight past them.
+const standSpot = (j) => [-17 + j, 23.8]
+const yardWay = (j) => [[-11.5 + j, 19, 0], [-11.5 + j, 8, 0]]
+const nestStops = (j) =>
+  FARM.coops
+    .filter((c) => game.built(`coop${c.n}`))
+    .sort((a, b) => b.x - a.x)
+    .map((c) => ({ n: c.n, p: [c.x + 1.3 + j, c.z + 1.6 + j] }))
 
 function route(w, k) {
   const j = (k % 3) * 0.7 // side by side, not on top of each other
-  if (w.id === 'stocker') {
-    const yard = nestStops().map(([x, z]) => [x + j, z + j])
-    return { path: [[-17 + j, 23.8], [-11.5 + j, 19], [-11.5 + j, 8], ...yard.reverse()], opts: { speed: 2.2, pause: 1.6, pingPong: true } }
-  }
+  if (w.id === 'stocker') return { path: [standSpot(j)], opts: { speed: 2.6, pause: 1.4 }, stocker: j }
   if (w.id === 'hand') {
     const p = game.PLOTS.find((q) => q.n === game.state.plots.owned[k])
     if (!p) return null
@@ -87,12 +92,53 @@ export function buildWorkers(root, { parks } = {}) {
           n.group.rotation.y = w.id === 'oiler' ? Math.PI * 0.75 : 0 // drivers face south, the way the vehicles drive out
         }
         m.base = r.opts.speed ?? 0
+        if (r.stocker != null) Object.assign(m, { j: r.stocker, leg: 'home', carry: 0, stops: [], s: 0 })
         list[k] = m
       }
     }
   }
   sync()
   for (const e of ['hire', 'plot', 'reset', 'build', 'pump']) game.on(e, sync)
+  game.on('reset', () => {
+    for (const m of crews.get('stocker')) if (m) m.carry = 0
+  })
+
+  // A stocker has finished the pause at the end of its leg: act there, then set off on the next leg.
+  // Eggs leave a nest only when the stocker stands at it and reach the stand only when it is back.
+  const stocker = game.workerById('stocker')
+  function stockerNext(m) {
+    const wk = m.walker
+    const here = wk.pts[wk.i]
+    const cap = game.workerCarry(stocker)
+    const go = (pts) => {
+      wk.pts = [[here[0], here[1]], ...pts]
+      wk.i = 0
+    }
+    if (m.leg === 'home') {
+      if (m.carry > 0) m.carry -= game.stockerDrop(stocker, m.k, m.carry)
+      m.stops = nestStops(m.j)
+      if (m.carry >= cap || !m.stops.length) {
+        wk.wait = 2 // the stand is full (or no coop to visit): wait at it and try again
+        return
+      }
+      m.leg = 'out'
+      m.s = 0
+      go([...yardWay(m.j), m.stops[0].p])
+      return
+    }
+    // At nest stop m.s.
+    const stop = m.stops[m.s]
+    if (stop) m.carry += game.stockerPick(stop.n, cap - m.carry)
+    if (m.carry < cap && m.s + 1 < m.stops.length) {
+      m.s++
+      go([m.stops[m.s].p])
+      return
+    }
+    // Full (or every nest visited): back past the nests already visited, up the yard walk, to the stand.
+    m.leg = 'home'
+    const back = m.stops.slice(0, m.s).reverse().map((x) => [x.p[0], x.p[1], 0])
+    go([...back, ...yardWay(m.j).reverse(), standSpot(m.j)])
+  }
 
   return {
     crews,
@@ -103,6 +149,8 @@ export function buildWorkers(root, { parks } = {}) {
           if (!m) continue
           if (m.walker) {
             m.walker.speed = m.base * speed
+            if (m.leg && m.walker.i === m.walker.pts.length - 1 && m.walker.wait <= 0) stockerNext(m)
+            if (m.n.load) m.n.load.visible = !m.leg || m.carry > 0
             updateWalker(m.walker, t, dt)
           } else {
             m.n.group.visible = m.kind === 'oiler' || !parks?.out(m.kind, m.k)

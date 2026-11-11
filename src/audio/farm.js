@@ -278,18 +278,18 @@ function whoosh(x, z, far, gain) {
   burst({ t: A.ctx.currentTime + 0.02, noise: 'pink', type: 'bandpass', f: 320, f2: 560, q: 0.8, a: 0.45, d: 0.7, gain: gain * p.level, pan: p.pan, verb: 0.5, bus: A.amb })
 }
 function bell(x, z) {
-  const p = place(x, z, 120, 6)
+  const p = place(x, z, 25, 3)
   if (p.level < 0.02 || !voice(0.6, 0.5)) return
   modal({ t: A.ctx.currentTime + 0.02, f: 1650, modes: [[1, 1, 0.45], [2.4, 0.5, 0.25], [3.9, 0.25, 0.15]], beat: 6, gain: 0.3 * p.level, pan: p.pan, verb: p.verb, strike: 0.3, bus: A.sfx })
 }
 function horn(x, z, len) {
-  const p = place(x, z, 700, 20)
+  const p = place(x, z, 80, 10)
   if (p.level < 0.01 || !voice(len + 0.5, 1)) return
   const t = A.ctx.currentTime + 0.02
   for (const f of [277, 349, 415, 554]) tone({ t, type: 'sawtooth', f, detune: rnd(-6, 6), a: 0.06, hold: len, d: 0.25, gain: 0.07 * p.level, pan: p.pan, verb: p.verb + 0.3, lp: 1800, bus: A.sfx })
 }
 function clack(x, z, g) {
-  const p = place(x, z, 160, 8)
+  const p = place(x, z, 35, 4)
   if (p.level < 0.02 || !voice(0.3, 0.5)) return
   const t = A.ctx.currentTime + 0.02
   for (let i = 0; i < 2; i++) {
@@ -696,7 +696,7 @@ export function createFarmAudio(farm) {
       const tr = farm.north.train
       if (tr.active) {
         const nx = Math.max(tr.tailX, Math.min(L.x, tr.headX))
-        const p = place(nx, tr.z, 260, 10)
+        const p = place(nx, tr.z, 45, 6)
         loops.train.set(0.5 * p.level, p.pan, p.verb)
         // Clacks: each car's bogies over a rail joint every 12 m of travel.
         const joint = Math.floor(tr.headX / 12)

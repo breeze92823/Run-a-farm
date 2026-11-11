@@ -10,6 +10,7 @@ import { bodyCount, initPhysics, stepPhysics } from './physics.js'
 import { createLighting } from './lighting.js'
 import { createWorld } from './world.js'
 import { buildFarm } from './farm/index.js'
+import { initGround, liftPlayer, updateGround } from './farm/ground.js'
 import { createHud } from './hud/hud.js'
 import { closeTopWindow } from './hud/window.js'
 import { hand, selectHotbar } from './game.js'
@@ -89,6 +90,7 @@ lighting = createLighting(scene, renderer, preset)
 const world = createWorld(scene) // the clouds
 bloxity.loadingStep('Building the farm')
 const farm = buildFarm(scene, lighting, preset)
+initGround(scene) // the drawn ground the player and vehicles stand on (ridges, slabs, ballast)
 // Respawning (R, HOME, the portal) gets off whatever the player rides first.
 const goHome = () => {
   farm.farm.rideables.dismount()
@@ -265,6 +267,8 @@ function frame(dtOverride) {
 
   stepPhysics(dt) // runs the player controller + world at the fixed rate, interpolates bodies
   interpolatePlayer()
+  updateGround(dt)
+  liftPlayer(player, dt) // feet (and the ridden vehicle) onto drawn ground that has no collider
 
   const p = player.renderPosition
   const seat = mount.active?.seat
